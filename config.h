@@ -157,21 +157,33 @@ static const char *menucmd[] = {
     "--hf",       "#89b4fa", "--ab", "#000000", NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
-static const char *termscratch[] = {"t", "ghostty", "--class=ghostty.term",
-                                    "--title=Terminal", NULL};
+static const char *termscratch[] = {"t",
+                                    "ghostty",
+                                    "--class=ghostty.term",
+                                    "--title=Terminal",
+                                    "--window-height=30",
+                                    "--window-width=150",
+                                    NULL};
 
 static const char *notesscratch[] = {
     "n",
     "ghostty",
     "--class=ghostty.notes",
     "--title=Notes",
+    "--window-height=30",
+    "--window-width=150",
     "-e",
     "tmux attach-session -t Notes || tmux new-session -s Notes -c "
     "~/Documents/Notes/Contents/",
     NULL};
-const char *btopscratch[] = {
-    "b", "ghostty", "--command='btop'", "--class=ghostty.btop", "--title=Btop",
-    NULL};
+const char *btopscratch[] = {"b",
+                             "ghostty",
+                             "--command='btop'",
+                             "--class=ghostty.btop",
+                             "--title=Btop",
+                             "--window-height=30",
+                             "--window-width=150",
+                             NULL};
 const char *signalscratch[] = {"s", "signal-desktop", NULL};
 static const Key keys[] = {
     /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
