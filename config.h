@@ -19,6 +19,9 @@ static const float rootcolor[] = COLOR(0x000000ff);
  * behavior */
 static const float fullscreen_bg[] = {0.1f, 0.1f, 0.1f,
                                       1.0f}; /* You can also use glsl colors */
+static const char *cursor_theme = "Bibata-Modern-Classic";
+static const char cursor_size[] =
+    "24"; /* Make sure it's a valid integer, otherwise things will break */
 static uint32_t colors[][3] = {
     /*               fg          bg          border    */
     [SchemeNorm] = {0xffffffff, 0x000000ff, 0x00000000ff},
