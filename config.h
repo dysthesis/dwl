@@ -146,7 +146,12 @@ static const enum libinput_config_tap_button_map button_map =
 
 /* commands */
 static const char *termcmd[] = {"ghostty", NULL};
-static const char *menucmd[] = {"bemenu-run", NULL};
+static const char *menucmd[] = {
+    "bemenu-run", "-b",      "-p",   "",     "--fn", "JBMono Nerd Font 10",
+    "-H",         "32",      "--hp", "8",       "--fb", "#000000",
+    "--ff",       "#ffffff", "--nb", "#000000", "--nf", "#ffffff",
+    "--tb",       "#89b4fa", "--hb", "#11111b", "--tf", "#000000",
+    "--hf",       "#89b4fa", "--ab", "#000000", NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
 static const char *termscratch[] = {"t", "ghostty", "--class=ghostty.term",
@@ -164,7 +169,7 @@ static const char *notesscratch[] = {
 const char *btopscratch[] = {
     "b", "ghostty", "--command='btop'", "--class=ghostty.btop", "--title=Btop",
     NULL};
-const char *signalscratch[] = {"signal-desktop", NULL};
+const char *signalscratch[] = {"s", "signal-desktop", NULL};
 static const Key keys[] = {
     /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
     /* modifier                  key                 function        argument */
@@ -174,7 +179,9 @@ static const Key keys[] = {
     {MODKEY, XKB_KEY_n, togglescratch, {.v = notesscratch}},
     {MODKEY, XKB_KEY_b, togglescratch, {.v = btopscratch}},
     {MODKEY, XKB_KEY_s, togglescratch, {.v = signalscratch}},
-    {MODKEY, XKB_KEY_b, spawn, SHCMD("grim -g '$(slurp)' - | swappy -f -''")},
+    {MODKEY, XKB_KEY_p, spawn, SHCMD("grim -g \"$(slurp)\" - | swappy -f -''")},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_Escape, spawn,
+     SHCMD("~/.local/scripts/powermenu")},
 
     // { MODKEY,                    XKB_KEY_grave,      focusortogglescratch,
     // {.v = scratchpadcmd } }, { MODKEY,                    XKB_KEY_grave,
