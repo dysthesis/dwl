@@ -35,10 +35,11 @@ static int log_level = WLR_ERROR;
 /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at
  * least one example) */
 static const Rule rules[] = {
-    /* app_id             title         tags mask     isfloating   monitor
-       scratchkey */
-    /* examples: */
+    {.id = "ghostty", .isterm = 1},
     {.id = "ghostty.term", .isfloating = 1, .monitor = -1, .scratchkey = 't'},
+    {.id = "ghostty.notes", .isfloating = 1, .monitor = -1, .scratchkey = 'n'},
+    {.id = "ghostty.btop", .isfloating = 1, .monitor = -1, .scratchkey = 'b'},
+    {.id = "signal", .isfloating = 1, .monitor = -1, .scratchkey = 's'},
 };
 
 /* layout(s) */
@@ -148,15 +149,31 @@ static const char *termcmd[] = {"ghostty", NULL};
 static const char *menucmd[] = {"bemenu-run", NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
-static const char *scratchpadcmd[] = {"t", "ghostty", "--class=ghostty.term",
-                                      NULL};
+static const char *termscratch[] = {"t", "ghostty", "--class=ghostty.term",
+                                    "--title=Terminal", NULL};
 
+static const char *notesscratch[] = {
+    "n",
+    "ghostty",
+    "--class=ghostty.notes",
+    "--title=Notes",
+    "-e",
+    "tmux attach-session -t Notes || tmux new-session -s Notes -c "
+    "~/Documents/Notes/Contents/",
+    NULL};
+const char *btopscratch[] = {
+    "b", "ghostty", "--command='btop'", "--class=ghostty.btop", "--title=Btop",
+    NULL};
+const char *signalscratch[] = {"signal-desktop", NULL};
 static const Key keys[] = {
     /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
     /* modifier                  key                 function        argument */
     {MODKEY, XKB_KEY_r, spawn, {.v = menucmd}},
     {MODKEY, XKB_KEY_Return, spawn, {.v = termcmd}},
-    {MODKEY, XKB_KEY_t, togglescratch, {.v = scratchpadcmd}},
+    {MODKEY, XKB_KEY_t, togglescratch, {.v = termscratch}},
+    {MODKEY, XKB_KEY_n, togglescratch, {.v = notesscratch}},
+    {MODKEY, XKB_KEY_b, togglescratch, {.v = btopscratch}},
+    {MODKEY, XKB_KEY_s, togglescratch, {.v = signalscratch}},
     {MODKEY, XKB_KEY_b, spawn, SHCMD("grim -g '$(slurp)' - | swappy -f -''")},
 
     // { MODKEY,                    XKB_KEY_grave,      focusortogglescratch,
