@@ -38,10 +38,7 @@ static const Rule rules[] = {
     /* app_id             title         tags mask     isfloating   monitor
        scratchkey */
     /* examples: */
-    {"Gimp_EXAMPLE", NULL, 0, 1, -1,
-     0}, /* Start on currently visible tags floating, not tiled */
-    {"firefox_EXAMPLE", NULL, 1 << 8, 0, -1, 0}, /* Start on ONLY tag "9" */
-    {NULL, "ghostty.term", 0, 1, -1, 's'},
+    {.id = "ghostty.term", .isfloating = 1, .monitor = -1, .scratchkey = 't'},
 };
 
 /* layout(s) */
