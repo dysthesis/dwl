@@ -218,6 +218,8 @@ static const Key keys[] = {
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_Escape, spawn,
      SHCMD("~/.local/scripts/powermenu")},
 
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_J, movestack, {.i = +1}},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_K, movestack, {.i = -1}},
     // { MODKEY,                    XKB_KEY_grave,      focusortogglescratch,
     // {.v = scratchpadcmd } }, { MODKEY,                    XKB_KEY_grave,
     // focusortogglematchingscratch, {.v = scratchpadcmd } },
