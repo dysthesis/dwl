@@ -1,0 +1,5 @@
+#!/bin/sh
+wlsunset -l -6.2129908 -L 106.5384663 &
+dunst &
+gentoo-pipewire-launcher restart &
+swaybg -i ~/.config/wallpaper.png &

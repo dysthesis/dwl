@@ -1,0 +1,4 @@
+#!/bin/sh
+STATUSBAR=~/.config/dwl/bar
+STARTUP=~/.config/dwl/startup
+sh $STATUSBAR | dbus-run-session dwl -s $STARTUP
