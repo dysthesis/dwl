@@ -25,7 +25,7 @@ static const char cursor_size[] =
 static uint32_t colors[][3] = {
     /*               fg          bg          border    */
     [SchemeNorm] = {0xffffffff, 0x000000ff, 0x00000000ff},
-    [SchemeSel] = {0x000000ff, 0xffffffff, 0xffffffff},
+    [SchemeSel] = {0xffffffff, 0x11111bff, 0xffffffff},
     [SchemeUrg] = {0, 0, 0xf38ba8},
 };
 
@@ -184,6 +184,13 @@ const char *btopscratch[] = {"b",
                              "--window-height=30",
                              "--window-width=150",
                              NULL};
+const char *raisevol[] = {
+    "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
+};
+const char *lowervol[] = {"wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-",
+                          NULL};
+const char *raisebright[] = {"brightnessctl", "set", "5%+", NULL};
+const char *lowerbright[] = {"brightnessctl", "set", "5%-", NULL};
 const char *signalscratch[] = {"s", "signal-desktop", NULL};
 static const Key keys[] = {
     /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
@@ -194,6 +201,10 @@ static const Key keys[] = {
     {MODKEY, XKB_KEY_n, togglescratch, {.v = notesscratch}},
     {MODKEY, XKB_KEY_b, togglescratch, {.v = btopscratch}},
     {MODKEY, XKB_KEY_s, togglescratch, {.v = signalscratch}},
+    {0, XKB_KEY_XF86AudioRaiseVolume, spawn, {.v = raisevol}},
+    {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
+    {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
+    {0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = lowerbright}},
     {MODKEY, XKB_KEY_p, spawn, SHCMD("grim -g \"$(slurp)\" - | swappy -f -''")},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_Escape, spawn,
      SHCMD("~/.local/scripts/powermenu")},
