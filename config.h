@@ -38,6 +38,9 @@ static int log_level = WLR_ERROR;
 /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at
  * least one example) */
 static const Rule rules[] = {
+    {.id = "zen-beta", .tags = 1 << 0},
+    {.id = "vesktop", .tags = 1 << 2},
+    {.id = "mpv", .tags = 1 << 3},
     {.id = "ghostty", .isterm = 1},
     {.id = "ghostty.term", .isfloating = 1, .monitor = -1, .scratchkey = 't'},
     {.id = "ghostty.notes", .isfloating = 1, .monitor = -1, .scratchkey = 'n'},
@@ -150,19 +153,25 @@ static const enum libinput_config_tap_button_map button_map =
 /* commands */
 static const char *termcmd[] = {"ghostty", NULL};
 static const char *menucmd[] = {
-    "bemenu-run", "-b",      "-p",   "",     "--fn", "JBMono Nerd Font 10",
-    "-H",         "32",      "--hp", "8",       "--fb", "#000000",
-    "--ff",       "#ffffff", "--nb", "#000000", "--nf", "#ffffff",
-    "--tb",       "#89b4fa", "--hb", "#11111b", "--tf", "#000000",
-    "--hf",       "#89b4fa", "--ab", "#000000", NULL};
+    "bemenu-run", "--binding", "vim",
+    "-i",         "-b",        "-p",
+    "",        "--fn",      "JBMono Nerd Font 10",
+    "-H",         "32",        "--hp",
+    "8",          "--fb",      "#000000",
+    "--ff",       "#ffffff",   "--nb",
+    "#000000",    "--nf",      "#ffffff",
+    "--tb",       "#89b4fa",   "--hb",
+    "#11111b",    "--tf",      "#000000",
+    "--hf",       "#89b4fa",   "--ab",
+    "#000000",    NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
 static const char *termscratch[] = {"t",
                                     "ghostty",
                                     "--class=ghostty.term",
                                     "--title=Terminal",
-                                    "--window-height=30",
-                                    "--window-width=150",
+                                    "--window-height=40",
+                                    "--window-width=190",
                                     NULL};
 
 static const char *notesscratch[] = {
@@ -170,8 +179,8 @@ static const char *notesscratch[] = {
     "ghostty",
     "--class=ghostty.notes",
     "--title=Notes",
-    "--window-height=30",
-    "--window-width=150",
+    "--window-height=40",
+    "--window-width=190",
     "-e",
     "tmux attach-session -t Notes || tmux new-session -s Notes -c "
     "~/Documents/Notes/Contents/",
@@ -181,8 +190,8 @@ const char *btopscratch[] = {"b",
                              "--command='btop'",
                              "--class=ghostty.btop",
                              "--title=Btop",
-                             "--window-height=30",
-                             "--window-width=150",
+                             "--window-height=40",
+                             "--window-width=190",
                              NULL};
 const char *raisevol[] = {
     "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
