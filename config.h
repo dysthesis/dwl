@@ -46,6 +46,7 @@ static const Rule rules[] = {
     {.id = "ghostty.term", .isfloating = 1, .monitor = -1, .scratchkey = 't'},
     {.id = "ghostty.notes", .isfloating = 1, .monitor = -1, .scratchkey = 'n'},
     {.id = "ghostty.btop", .isfloating = 1, .monitor = -1, .scratchkey = 'b'},
+    {.id = "ghostty.irc", .isfloating = 1, .monitor = -1, .scratchkey = 'i'},
     {.id = "signal", .isfloating = 1, .monitor = -1, .scratchkey = 's'},
 };
 
@@ -185,7 +186,21 @@ static const char *notesscratch[] = {
     "-e",
     "tmux attach-session -t Notes || tmux new-session -s Notes -c "
     "~/Documents/Notes/Contents/",
+    "nvim",
     NULL};
+
+static const char *ircscratch[] = {
+    "i",
+    "ghostty",
+    "--class=ghostty.irc",
+    "--title=IRC",
+    "--window-height=40",
+    "--window-width=190",
+    "-e",
+    "tmux attach-session -t IRC || tmux new-session -s IRC",
+    "weechat",
+    NULL};
+
 const char *btopscratch[] = {"b",
                              "ghostty",
                              "--command='btop'",
@@ -211,6 +226,7 @@ static const Key keys[] = {
     {MODKEY, XKB_KEY_n, togglescratch, {.v = notesscratch}},
     {MODKEY, XKB_KEY_b, togglescratch, {.v = btopscratch}},
     {MODKEY, XKB_KEY_s, togglescratch, {.v = signalscratch}},
+    {MODKEY, XKB_KEY_i, togglescratch, {.v = ircscratch}},
     {0, XKB_KEY_XF86AudioRaiseVolume, spawn, {.v = raisevol}},
     {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
     {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
