@@ -14,6 +14,7 @@ static const float focuscolor[]            = COLOR(0x005577ff);
 static const float urgentcolor[]           = COLOR(0xff0000ff);
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
 static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You can also use glsl colors */
+static const int respect_monitor_reserved_area = 0;  /* 1 to monitor center while respecting the monitor's reserved area, 0 to monitor center */
 
 /* tagging - TAGCOUNT must be no greater than 31 */
 #define TAGCOUNT (9)
@@ -30,10 +31,11 @@ static const char *const autostart[] = {
 
 /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at least one example) */
 static const Rule rules[] = {
-	/* app_id             title       tags mask     isfloating   monitor */
+	/* app_id             title         tags mask     isfloating   monitor scratchkey   x   y   width   height */
 	/* examples: */
-	{ "Gimp_EXAMPLE",     NULL,       0,            1,           -1 }, /* Start on currently visible tags floating, not tiled */
-	{ "firefox_EXAMPLE",  NULL,       1 << 8,       0,           -1 }, /* Start on ONLY tag "9" */
+	{ "Gimp_EXAMPLE",     NULL,         0,            1,           -1,     0,          0,  0,  1000,   0.75 }, /* Start on currently visible tags floating, not tiled */
+	{ "firefox_EXAMPLE",  NULL,         1 << 8,       0,           -1,     0,          0,  0,  0,      0 },   /* Start on ONLY tag "9" */
+	{ NULL,               "scratchpad", 0,            1,           -1,     's',        0,  0,  0,      0 },
 };
 
 /* layout(s) */
@@ -136,11 +138,17 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 static const char *termcmd[] = { "foot", NULL };
 static const char *menucmd[] = { "wmenu-run", NULL };
 
+/* named scratchpads - First arg only serves to match against key in rules*/
+static const char *scratchpadcmd[] = { "s", "alacritty", "-t", "scratchpad", NULL };
+
 static const Key keys[] = {
 	/* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
 	/* modifier                  key                 function        argument */
 	{ MODKEY,                    XKB_KEY_p,          spawn,          {.v = menucmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Return,     spawn,          {.v = termcmd} },
+	{ MODKEY,                    XKB_KEY_grave,      togglescratch,  {.v = scratchpadcmd } },
+	// { MODKEY,                    XKB_KEY_grave,      focusortogglescratch, {.v = scratchpadcmd } },
+	// { MODKEY,                    XKB_KEY_grave,      focusortogglematchingscratch, {.v = scratchpadcmd } },
 	{ MODKEY,                    XKB_KEY_j,          focusstack,     {.i = +1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,     {.i = -1} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_J,          movestack,      {.i = +1} },
