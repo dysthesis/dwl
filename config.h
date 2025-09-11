@@ -13,6 +13,9 @@ static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
 static const float focuscolor[] = COLOR(0xffffffff);
 static const float urgentcolor[] = COLOR(0xffaa88ff);
+static const char *cursor_theme = "Bibata-Modern-Classic";
+static const char cursor_size[] =
+    "24"; /* Make sure it's a valid integer, otherwise things will break */
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old
  * behavior */
 static const float fullscreen_bg[] = {0.0f, 0.0f, 0.0f,
@@ -203,8 +206,11 @@ static const char *taskscratch[] = {"d",
                                     NULL};
 static const char *signalscratch[] = {"s", "signal-desktop", NULL};
 
-const char *raisevol[] = { "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL, };
-const char *lowervol[] = {"wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-", NULL}; 
+const char *raisevol[] = {
+    "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
+};
+const char *lowervol[] = {"wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-",
+                          NULL};
 const char *raisebright[] = {"brightnessctl", "set", "5%+", NULL};
 const char *lowerbright[] = {"brightnessctl", "set", "5%-", NULL};
 

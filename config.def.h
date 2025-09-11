@@ -14,6 +14,8 @@ static const float focuscolor[]            = COLOR(0x005577ff);
 static const float urgentcolor[]           = COLOR(0xff0000ff);
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
 static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You can also use glsl colors */
+static const char *cursor_theme            = NULL;
+static const char cursor_size[]            = "24"; /* Make sure it's a valid integer, otherwise things will break */
 static int enableautoswallow = 1; /* enables autoswallowing newly spawned clients */
 static float swallowborder = 1.0f; /* add this multiplied by borderpx to border when a client is swallowed */
 static const int respect_monitor_reserved_area = 0;  /* 1 to monitor center while respecting the monitor's reserved area, 0 to monitor center */
