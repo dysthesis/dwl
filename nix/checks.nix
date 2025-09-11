@@ -44,7 +44,8 @@ _: {
             echo "Running clang-analyzer (scan-build) with status-bugs..."
             export CC=${pkgs.clang}/bin/clang
             export CXX=${pkgs.clang}/bin/clang++
-            scan-build \
+            # Use the Nix-patched scan-build wrapper from clang-analyzer to avoid /usr/bin/env shebangs
+            ${pkgs.clang-analyzer}/bin/scan-build \
               --status-bugs \
               --use-cc="$CC" \
               --use-c++="$CXX" \

@@ -83,7 +83,7 @@ static const MonitorRule monrules[] = {
 static const TagRule tagrules[] = {
     /* tag     mfact      nmaster   layout */
     /* defaults */
-    {0, 0.55, 1, &layouts[0]}};
+    {0, 0.55f, 1, &layouts[0]}};
 
 /* keyboard */
 static const struct xkb_rule_names xkb_rules = {

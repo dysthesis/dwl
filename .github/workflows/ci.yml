@@ -22,7 +22,7 @@ jobs:
         run: nix --version
 
       - name: Flake checks
-        run: nix flake check --print-build-logs --show-trace
+        run: nix flake check --print-build-logs --show-trace --all-systems
 
       - name: Build scan-build report
         run: nix build --print-build-logs .#checks.x86_64-linux.scan-build
