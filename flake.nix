@@ -16,8 +16,8 @@
         ./nix/checks.nix
       ];
       systems = [
-        "x86-64_linux"
         "aarch64-linux"
+        "x86_64-linux"
       ];
     });
 }
