@@ -2,8 +2,8 @@ dwl
 result
 result/
 .direnv/
+.direnv
 *.o
 *-protocol.c
 *-protocol.h
 .ccls-cache
-config.h

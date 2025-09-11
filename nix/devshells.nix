@@ -19,8 +19,9 @@ _: {
           nixfmt
           statix
           deadnix
+          clang-analyzer
+          clang-tools
         ];
-
       };
     };
 }

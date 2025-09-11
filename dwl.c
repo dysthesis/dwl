@@ -310,8 +310,8 @@ static void destroykeyboardgroup(struct wl_listener *listener, void *data);
 static Monitor *dirtomon(enum wlr_direction dir);
 static void focusclient(Client *c, int lift);
 static void focusmon(const Arg *arg);
-static void focusortogglematchingscratch(const Arg *arg);
-static void focusortogglescratch(const Arg *arg);
+static void focusortogglematchingscratch(const Arg *arg) __attribute__((unused));
+static void focusortogglescratch(const Arg *arg) __attribute__((unused));
 static void focusstack(const Arg *arg);
 static Client *focustop(Monitor *m);
 static void fullscreennotify(struct wl_listener *listener, void *data);
@@ -443,7 +443,6 @@ static struct wlr_output_layout *output_layout;
 static struct wlr_box sgeom;
 static struct wl_list mons;
 static Monitor *selmon;
-static Pertag pertag;
 
 /* global event handlers */
 static struct wl_listener cursor_axis = {.notify = axisnotify};
@@ -500,6 +499,8 @@ struct Pertag {
 	unsigned int sellts[TAGCOUNT + 1]; /* selected layouts */
 	const Layout *ltidxs[TAGCOUNT + 1][2]; /* matrix of tags and layouts indexes  */
 };
+
+static Pertag pertag;
 
 static pid_t *autostart_pids;
 static size_t autostart_len;
@@ -560,10 +561,10 @@ applyrules(Client *c)
 			if (c->isfloating || !mon->lt[mon->sellt]->arrange) {
 				/* client is floating or in floating layout */
 				struct wlr_box b = respect_monitor_reserved_area ? mon->w : mon->m;
-				newwidth = (int)round(r->w ? (r->w <= 1 ? b.width * r->w : r->w) : c->geom.width);
-				newheight = (int)round(r->h ? (r->h <= 1 ? b.height * r->h : r->h) : c->geom.height);
-				newx = (int)round(r->x ? (r->x <= 1 ? b.width * r->x + b.x : r->x + b.x) : c->geom.x);
-				newy = (int)round(r->y ? (r->y <= 1 ? b.height * r->y + b.y : r->y + b.y) : c->geom.y);
+				newwidth = (int)round((r->w > 0) ? ((r->w <= 1) ? b.width * r->w : r->w) : c->geom.width);
+				newheight = (int)round((r->h > 0) ? ((r->h <= 1) ? b.height * r->h : r->h) : c->geom.height);
+				newx = (int)round((r->x > 0) ? ((r->x <= 1) ? b.width * r->x + b.x : r->x + b.x) : c->geom.x);
+				newy = (int)round((r->y > 0) ? ((r->y <= 1) ? b.height * r->y + b.y : r->y + b.y) : c->geom.y);
 				apply_resize = 1;
 			}
 		}
@@ -1070,21 +1071,32 @@ commitpopup(struct wl_listener *listener, void *data)
 	if (!popup->base->initial_commit)
 		return;
 
-	type = toplevel_from_wlr_surface(popup->base->surface, &c, &l);
-	if (!popup->parent || type < 0)
-		return;
-	popup->base->surface->data = wlr_scene_xdg_surface_create(
-			popup->parent->data, popup->base);
-	if ((l && !l->mon) || (c && !c->mon)) {
-		wlr_xdg_popup_destroy(popup);
-		return;
-	}
-	box = type == LayerShell ? l->mon->m : c->mon->w;
-	box.x -= (type == LayerShell ? l->scene->node.x : c->geom.x);
-	box.y -= (type == LayerShell ? l->scene->node.y : c->geom.y);
-	wlr_xdg_popup_unconstrain_from_box(popup, &box);
-	wl_list_remove(&listener->link);
-	free(listener);
+    type = toplevel_from_wlr_surface(popup->base->surface, &c, &l);
+    if (!popup->parent || type < 0)
+        return;
+    popup->base->surface->data = wlr_scene_xdg_surface_create(
+                popup->parent->data, popup->base);
+
+    if (type == LayerShell) {
+        if (!l || !l->mon) {
+            wlr_xdg_popup_destroy(popup);
+            return;
+        }
+        box = l->mon->m;
+        box.x -= l->scene->node.x;
+        box.y -= l->scene->node.y;
+    } else {
+        if (!c || !c->mon) {
+            wlr_xdg_popup_destroy(popup);
+            return;
+        }
+        box = c->mon->w;
+        box.x -= c->geom.x;
+        box.y -= c->geom.y;
+    }
+    wlr_xdg_popup_unconstrain_from_box(popup, &box);
+    wl_list_remove(&listener->link);
+    free(listener);
 }
 
 void
@@ -1634,18 +1646,18 @@ focusclient(Client *c, int lift)
 	}
 
 	/* Deactivate old client if focus is changing */
-	if (old && (!c || client_surface(c) != old)) {
-		/* If an overlay is focused, don't focus or activate the client,
-		 * but only update its position in fstack to render its border with focuscolor
-		 * and focus it after the overlay is closed. */
-		if (old_client_type == LayerShell && wlr_scene_node_coords(
-					&old_l->scene->node, &unused_lx, &unused_ly)
-				&& old_l->layer_surface->current.layer >= ZWLR_LAYER_SHELL_V1_LAYER_TOP) {
-			return;
-		} else if (old_c && old_c == exclusive_focus && client_wants_focus(old_c)) {
-			return;
-		/* Don't deactivate old client if the new one wants focus, as this causes issues with winecfg
-		 * and probably other clients */
+    if (old && (!c || client_surface(c) != old)) {
+        /* If an overlay is focused, don't focus or activate the client,
+         * but only update its position in fstack to render its border with focuscolor
+         * and focus it after the overlay is closed. */
+        if (old_client_type == LayerShell && old_l && wlr_scene_node_coords(
+                        &old_l->scene->node, &unused_lx, &unused_ly)
+                        && old_l->layer_surface->current.layer >= ZWLR_LAYER_SHELL_V1_LAYER_TOP) {
+            return;
+        } else if (old_c && old_c == exclusive_focus && client_wants_focus(old_c)) {
+            return;
+        /* Don't deactivate old client if the new one wants focus, as this causes issues with winecfg
+         * and probably other clients */
 		} else if (old_c && !client_is_unmanaged(old_c) && (!c || !client_wants_focus(c))) {
 			client_set_border_color(old_c, bordercolor);
 
@@ -1682,7 +1694,7 @@ focusmon(const Arg *arg)
 	focusclient(focustop(selmon), 1);
 }
 
-void
+static void
 focusortogglematchingscratch(const Arg *arg)
 {
 	Client *c;
@@ -1733,7 +1745,7 @@ focusortogglematchingscratch(const Arg *arg)
 	}
 }
 
-void
+static void
 focusortogglescratch(const Arg *arg)
 {
 	Client *c;
@@ -2429,11 +2441,12 @@ parentpid(pid_t pid)
 	FILE *f;
 	char buf[256];
 	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)pid);
-	if (!(f = fopen(buf, "r")))
-		return 0;
-	fscanf(f, "%*u %*s %*c %u", &v);
-	fclose(f);
-	return (pid_t)v;
+    if (!(f = fopen(buf, "r")))
+        return 0;
+    if (fscanf(f, "%*u %*s %*c %u", &v) != 1)
+        v = 0;
+    fclose(f);
+    return (pid_t)v;
 }
 
 void
@@ -2933,16 +2946,16 @@ setup(void)
     wlr_xdg_output_manager_v1_create(dpy, output_layout);
 
 	for (i = 0; i <= TAGCOUNT; i++) {
-		for (r = tagrules; r < END(tagrules); r++) {
-			if (!r->tag || r->tag == i) {
-				pertag.mfacts[i] = r->mfact;
-				pertag.nmasters[i] = r->nmaster;
-				pertag.sellts[i] = 0;
-				pertag.ltidxs[i][0] = r->lt;
-				pertag.ltidxs[i][1] = r->lt;
-				break;
-			}
-		}
+        for (r = tagrules; r < END(tagrules); r++) {
+            if (!r->tag || r->tag == (unsigned int)i) {
+                pertag.mfacts[i] = r->mfact;
+                pertag.nmasters[i] = r->nmaster;
+                pertag.sellts[i] = 0;
+                pertag.ltidxs[i][0] = r->lt;
+                pertag.ltidxs[i][1] = r->lt;
+                break;
+            }
+        }
 	}
 
 	/* Configure a listener to be notified when new outputs are available on the
@@ -3230,17 +3243,23 @@ tile(Monitor *m)
 	wl_list_for_each(c, &clients, link) {
 		if (!VISIBLEON(c, m) || c->isfloating || c->isfullscreen)
 			continue;
-		if (i < m->nmaster) {
-			resize(c, (struct wlr_box){.x = m->w.x, .y = m->w.y + my, .width = mw,
-				.height = (m->w.height - my) / (MIN(n, m->nmaster) - i)}, 0, draw_borders);
-			my += c->geom.height;
-		} else {
-			resize(c, (struct wlr_box){.x = m->w.x + mw, .y = m->w.y + ty,
-				.width = m->w.width - mw, .height = (m->w.height - ty) / (n - i)}, 0, draw_borders);
-			ty += c->geom.height;
-		}
-		i++;
-	}
+        if (i < m->nmaster) {
+            int denom_master = MIN(n, m->nmaster) - i;
+            if (denom_master <= 0)
+                denom_master = 1;
+            resize(c, (struct wlr_box){.x = m->w.x, .y = m->w.y + my, .width = mw,
+                    .height = (m->w.height - my) / denom_master}, 0, draw_borders);
+            my += c->geom.height;
+        } else {
+            int denom_stack = n - i;
+            if (denom_stack <= 0)
+                denom_stack = 1;
+            resize(c, (struct wlr_box){.x = m->w.x + mw, .y = m->w.y + ty,
+                    .width = m->w.width - mw, .height = (m->w.height - ty) / denom_stack}, 0, draw_borders);
+            ty += c->geom.height;
+        }
+        i++;
+    }
 }
 
 void
@@ -3627,33 +3646,42 @@ xytomon(double x, double y)
 
 void
 xytonode(double x, double y, struct wlr_surface **psurface,
-		Client **pc, LayerSurface **pl, double *nx, double *ny)
+                Client **pc, LayerSurface **pl, double *nx, double *ny)
 {
-	struct wlr_scene_node *node, *pnode;
-	struct wlr_surface *surface = NULL;
-	Client *c = NULL;
-	LayerSurface *l = NULL;
-	int layer;
+    struct wlr_scene_node *node, *pnode, *ownernode = NULL;
+    struct wlr_surface *surface = NULL;
+    Client *c = NULL;
+    LayerSurface *l = NULL;
+    int layer;
 
-	for (layer = NUM_LAYERS - 1; !surface && layer >= 0; layer--) {
-		if (!(node = wlr_scene_node_at(&layers[layer]->node, x, y, nx, ny)))
-			continue;
+    for (layer = NUM_LAYERS - 1; !surface && layer >= 0; layer--) {
+        if (!(node = wlr_scene_node_at(&layers[layer]->node, x, y, nx, ny)))
+            continue;
 
-		if (node->type == WLR_SCENE_NODE_BUFFER)
-			surface = wlr_scene_surface_try_from_buffer(
-					wlr_scene_buffer_from_node(node))->surface;
-		/* Walk the tree to find a node that knows the client */
-		for (pnode = node; pnode && !c; pnode = &pnode->parent->node)
-			c = pnode->data;
-		if (c && c->type == LayerShell) {
-			c = NULL;
-			l = pnode->data;
-		}
-	}
+        if (node->type == WLR_SCENE_NODE_BUFFER)
+            surface = wlr_scene_surface_try_from_buffer(
+                    wlr_scene_buffer_from_node(node))->surface;
+        /* Walk the tree to find the nearest ancestor with associated data */
+        ownernode = NULL;
+        for (pnode = node; pnode; pnode = pnode->parent ? &pnode->parent->node : NULL) {
+            if (pnode->data) {
+                ownernode = pnode;
+                break;
+            }
+        }
+        if (ownernode) {
+            /* Determine whether this is a Client or a LayerSurface by its type tag */
+            c = ownernode->data;
+            if (c && c->type == LayerShell) {
+                c = NULL;
+                l = ownernode->data;
+            }
+        }
+    }
 
-	if (psurface) *psurface = surface;
-	if (pc) *pc = c;
-	if (pl) *pl = l;
+    if (psurface) *psurface = surface;
+    if (pc) *pc = c;
+    if (pl) *pl = l;
 }
 
 void
