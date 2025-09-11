@@ -101,13 +101,13 @@ _: {
           pkgs.runCommand "nixfmt-check"
             {
               buildInputs = [
-                pkgs.nixpkgs
+                pkgs.nixfmt
                 pkgs.findutils
               ];
               src = pkgs.lib.cleanSource ../.;
             }
             ''
-              echo "Checking Nix formatting with nixpkgs-fmt..."
+              echo "Checking Nix formatting with nixfmt..."
               files=$(find "$src" -type f -name '*.nix')
               if [ -n "$files" ]; then
                 nixfmt --check $files
