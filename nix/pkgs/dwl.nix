@@ -12,7 +12,10 @@
   wayland-scanner,
   wlroots_0_19 ? null,
   wlroots ? null,
+  # X stack (autopassed by callPackage)
   xorg ? null,
+  libX11 ? null,
+  xwayland ? null,
   enableXWayland ? false,
   # Optional: inject autostart commands into config.h at build time.
   # Format: list of argv vectors, e.g. [ [ "wbg" "/path/img.png" ] [ "foot" "--server" ] ]
@@ -44,18 +47,21 @@ ${body}${nl}  NULL /* terminate */
       throw "dwl: no wlroots package found (expected wlroots_0_19 or wlroots)";
 
   xDeps =
-    if enableXWayland && xorg != null then
+    if enableXWayland then
       [
         xorg.libxcb
         xorg.xcbutilwm
+        libX11
+        xwayland
       ]
     else
       [ ];
   xMakeFlags =
     if enableXWayland then
       [
-        "XWAYLAND=-DXWAYLAND"
-        "XLIBS=xcb xcb-icccm"
+        # Whitespace requires structured attrs; quote like nixpkgs
+        ''XWAYLAND="-DXWAYLAND"''
+        ''XLIBS="xcb xcb-icccm"''
       ]
     else
       [ ];
@@ -88,9 +94,13 @@ stdenv.mkDerivation rec {
 
   # Ensure installation under $out and point scanner directly
   makeFlags = xMakeFlags ++ [
+    "PKG_CONFIG=${stdenv.cc.targetPrefix}pkg-config"
     "WAYLAND_SCANNER=${wayland-scanner.bin}/bin/wayland-scanner"
   ];
   installFlags = [ "PREFIX=$(out)" ];
+
+  # Required for makeFlags entries with spaces (XLIBS)
+  __structuredAttrs = true;
 
   # Optionally inject autostart block into config.h prior to build/scan-build
   postPatch = lib.optionalString (autostart != null) (
