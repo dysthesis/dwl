@@ -3,7 +3,6 @@ _: {
     {
       config,
       pkgs,
-      self',
       ...
     }:
     let
@@ -24,7 +23,7 @@ _: {
       mkScanBuild = { enableXWayland ? false }: pkgs.stdenv.mkDerivation {
         pname = "dwl-scan-build-check";
         version = "1";
-        src = pkgs.lib.cleanSource ../..;
+        src = pkgs.lib.cleanSource ../.;
         nativeBuildInputs = with pkgs; [
           pkg-config
           wayland-scanner
@@ -94,7 +93,7 @@ _: {
         # Nix code hygiene
         nixfmt = pkgs.runCommand "nixpkgs-fmt-check" {
           buildInputs = [ pkgs.nixpkgs-fmt pkgs.findutils ];
-          src = pkgs.lib.cleanSource ../..;
+          src = pkgs.lib.cleanSource ../.;
         } ''
           echo "Checking Nix formatting with nixpkgs-fmt..."
           files=$(find "$src" -type f -name '*.nix')
@@ -106,7 +105,7 @@ _: {
 
         statix = pkgs.runCommand "statix-check" {
           buildInputs = [ pkgs.statix ];
-          src = pkgs.lib.cleanSource ../..;
+          src = pkgs.lib.cleanSource ../.;
         } ''
           echo "Running statix..."
           statix check "$src"
@@ -115,7 +114,7 @@ _: {
 
         deadnix = pkgs.runCommand "deadnix-check" {
           buildInputs = [ pkgs.deadnix ];
-          src = pkgs.lib.cleanSource ../..;
+          src = pkgs.lib.cleanSource ../.;
         } ''
           echo "Running deadnix..."
           deadnix --fail "$src"
@@ -123,12 +122,26 @@ _: {
         '';
 
         # Manpage lint (helpful to keep docs tidy)
+        # Include referenced manpages in MANPATH so cross-references resolve,
+        # and do not suppress mandoc output to ease debugging in CI logs.
         man-lint = pkgs.runCommand "man-lint" {
-          buildInputs = [ pkgs.mandoc ];
-          src = pkgs.lib.cleanSource ../..;
+          # Keep mandoc minimal, but add common refs used in dwl.1 so Xr checks pass.
+          buildInputs = [
+            pkgs.mandoc
+            pkgs.foot
+            pkgs.wmenu
+            pkgs.dwm
+            pkgs.xkeyboard_config
+          ];
+          src = pkgs.lib.cleanSource ../.;
         } ''
+          set -euo pipefail
           echo "Linting manpage with mandoc..."
-          mandoc -Tlint -Werror "$src/dwl.1" > /dev/null
+          # Work on a local copy to avoid odd path parsing in mandoc
+          cp "$src/dwl.1" ./dwl.1
+          # Ensure cross-references can be resolved by mandoc
+          export MANPATH="${pkgs.foot}/share/man:${pkgs.wmenu}/share/man:${pkgs.dwm}/share/man:${pkgs.xkeyboard_config}/share/man"
+          mandoc -Tlint -Werror ./dwl.1
           touch $out
         '';
       };
