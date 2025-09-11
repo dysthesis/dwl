@@ -14,6 +14,8 @@ static const float focuscolor[]            = COLOR(0x005577ff);
 static const float urgentcolor[]           = COLOR(0xff0000ff);
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
 static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You can also use glsl colors */
+static int enableautoswallow = 1; /* enables autoswallowing newly spawned clients */
+static float swallowborder = 1.0f; /* add this multiplied by borderpx to border when a client is swallowed */
 static const int respect_monitor_reserved_area = 0;  /* 1 to monitor center while respecting the monitor's reserved area, 0 to monitor center */
 
 /* tagging - TAGCOUNT must be no greater than 31 */
@@ -31,11 +33,12 @@ static const char *const autostart[] = {
 
 /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at least one example) */
 static const Rule rules[] = {
-	/* app_id             title         tags mask     isfloating   monitor scratchkey   x   y   width   height */
+	/* app_id             title         tags mask     isfloating   isterm   noswallow   monitor scratchkey   x   y   width   height */
 	/* examples: */
-	{ "Gimp_EXAMPLE",     NULL,         0,            1,           -1,     0,          0,  0,  1000,   0.75 }, /* Start on currently visible tags floating, not tiled */
-	{ "firefox_EXAMPLE",  NULL,         1 << 8,       0,           -1,     0,          0,  0,  0,      0 },   /* Start on ONLY tag "9" */
-	{ NULL,               "scratchpad", 0,            1,           -1,     's',        0,  0,  0,      0 },
+	{ "foot",             NULL,         0,            0,           1,       1,          -1,     0,          0,  0,  0,      0 },
+	{ "Gimp_EXAMPLE",     NULL,         0,            1,           0,       0,          -1,     0,          0,  0,  1000,   0.75 }, /* Start on currently visible tags floating, not tiled */
+	{ "firefox_EXAMPLE",  NULL,         1 << 8,       0,           0,       0,          -1,     0,          0,  0,  0,      0 },   /* Start on ONLY tag "9" */
+	{ NULL,               "scratchpad", 0,            1,           0,       0,          -1,     's',        0,  0,  0,      0 },
 };
 
 /* layout(s) */
@@ -166,6 +169,8 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_space,      setlayout,      {0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_space,      togglefloating, {0} },
 	{ MODKEY,                    XKB_KEY_e,         togglefullscreen, {0} },
+	{ MODKEY,                    XKB_KEY_a,          toggleswallow,  {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_A,          toggleautoswallow,{0} },
 	{ MODKEY,                    XKB_KEY_0,          view,           {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,            {.ui = ~0} },
 	{ MODKEY,                    XKB_KEY_comma,      focusmon,       {.i = WLR_DIRECTION_LEFT} },
