@@ -762,8 +762,8 @@ void arrangelayers(Monitor *m) {
     return;
 
   if (m->scene_buffer && m->scene_buffer->node.enabled) {
-    usable_area.height -= m->b.real_height;
-    usable_area.y += topbar ? m->b.real_height : 0;
+    usable_area.height -= m->b.real_height + vertpad;
+    usable_area.y += topbar ? m->b.real_height + vertpad : 0;
   }
 
   /* Arrange exclusive surfaces from top->bottom */
@@ -963,7 +963,7 @@ void buttonpress(struct wl_listener *listener, void *data) {
                                   cursor->y, NULL, NULL)) &&
         (buffer = wlr_scene_buffer_from_node(node)) &&
         buffer == selmon->scene_buffer) {
-      cx = (cursor->x - selmon->m.x) * selmon->wlr_output->scale;
+      cx = (cursor->x - selmon->m.x - sidepad) * selmon->wlr_output->scale;
       do
         x += TEXTW(selmon, tags[i]);
       while (cx >= x && ++i < LENGTH(tags));
@@ -1828,8 +1828,9 @@ void drawbar(Monitor *m) {
 
   wlr_scene_buffer_set_dest_size(m->scene_buffer, m->b.real_width,
                                  m->b.real_height);
-  wlr_scene_node_set_position(&m->scene_buffer->node, m->m.x,
-                              m->m.y + (topbar ? 0 : m->m.height - m->b.real_height));
+  wlr_scene_node_set_position(&m->scene_buffer->node, m->m.x + sidepad,
+                              m->m.y + (topbar ? vertpad
+                                               : m->m.height - m->b.real_height - vertpad));
   wlr_scene_buffer_set_buffer(m->scene_buffer, &buf->base);
   wlr_buffer_unlock(&buf->base);
 }
@@ -3726,8 +3727,8 @@ void updatebar(Monitor *m) {
   char fontattrs[12];
 
   wlr_output_transformed_resolution(m->wlr_output, &rw, &rh);
-  m->b.width = rw;
-  m->b.real_width = (int)((float)m->b.width / m->wlr_output->scale);
+  m->b.width = rw - (2 * sidepad);
+  m->b.real_width = (int)((float)rw / m->wlr_output->scale) - (2 * sidepad);
 
   /* Ensure drawing context exists before using it */
   if (!m->drw) {

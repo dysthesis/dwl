@@ -10,6 +10,8 @@ static const int smartborders              = 1;
 static const unsigned int borderpx         = 1;  /* border pixel of windows */
 static const int showbar                   = 1; /* 0 means no bar */
 static const int topbar                    = 1; /* 0 means bottom bar */
+static const int vertpad                   = 10; /* vertical padding of bar */
+static const int sidepad                   = 10; /* horizontal padding of bar */
 static const char *fonts[]                 = { "monospace:size=10" };
 static const float rootcolor[]             = COLOR(0x000000ff);
 static const float bordercolor[]           = COLOR(0x444444ff);
