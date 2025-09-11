@@ -87,6 +87,7 @@
 #define END(A) ((A) + LENGTH(A))
 #define TAGMASK ((1u << TAGCOUNT) - 1)
 #define TEXTW(mon, text) (drwl_font_getwidth((mon)->drw, (text)) + (mon)->lrpad)
+#define PREFIX(str, prefix) (!strncmp((str), (prefix), strlen(prefix)))
 #define LISTEN(E, L, H) wl_signal_add((E), ((L)->notify = (H), (L)))
 #define LISTEN_STATIC(E, H)                                                    \
   do {                                                                         \
@@ -362,6 +363,7 @@ static void destroykeyboardgroup(struct wl_listener *listener, void *data);
 static Monitor *dirtomon(enum wlr_direction dir);
 static void drawbar(Monitor *m);
 static void drawbars(void);
+static int drawstatus(Monitor *m);
 static void focusclient(Client *c, int lift);
 static void focusmon(const Arg *arg);
 static void focusortogglematchingscratch(const Arg *arg)
@@ -505,7 +507,7 @@ static struct wlr_box sgeom;
 static struct wl_list mons;
 static Monitor *selmon;
 
-static char stext[256];
+static char stext[512];
 static struct wl_event_source *status_event_source;
 
 static const struct wlr_buffer_impl buffer_impl = {
@@ -1785,11 +1787,8 @@ void drawbar(Monitor *m) {
     return;
 
   /* draw status first so it can be overdrawn by tags later */
-  if (m == selmon) { /* status is only drawn on selected monitor */
-    drwl_setscheme(m->drw, colors[SchemeNorm]);
-    tw = TEXTW(m, stext) - m->lrpad + 2; /* 2px right padding */
-    drwl_text(m->drw, m->b.width - tw, 0, tw, m->b.height, 0, stext, 0);
-  }
+  if (m == selmon) /* status is only drawn on selected monitor */
+    tw = drawstatus(m);
 
   wl_list_for_each(c, &clients, link) {
     if (c->mon != m)
@@ -1843,6 +1842,86 @@ void drawbar(Monitor *m) {
 void drawbars(void) {
   Monitor *m = NULL;
   wl_list_for_each(m, &mons, link) drawbar(m);
+}
+
+static int drawstatus(Monitor *m) {
+  int x, tw, iw;
+  char rstext[512] = "";
+  char *p, *argstart, *argend, *itext;
+  uint32_t scheme[3], *color;
+
+  /* calculate real width of stext */
+  for (p = stext; *p; p++) {
+    if (PREFIX(p, "^^")) {
+      strncat(rstext, p, 2);
+      p++;
+    } else if (PREFIX(p, "^fg(") || PREFIX(p, "^bg(")) {
+      argend = strchr(p, ')');
+      if (!argend) { /* ignore this command */
+        argstart = strchr(p, '(') + 1;
+        strncat(rstext, p, argstart - p);
+        p = argstart - 1;
+      } else {
+        p = argend;
+      }
+    } else {
+      strncat(rstext, p, 1);
+    }
+  }
+  tw = TEXTW(m, rstext) - m->lrpad;
+
+  x = m->b.width - tw;
+  itext = stext;
+  scheme[0] = colors[SchemeNorm][0];
+  scheme[1] = colors[SchemeNorm][1];
+  drwl_setscheme(m->drw, scheme);
+  for (p = stext; *p; p++) {
+    if (PREFIX(p, "^^")) {
+      p++;
+    } else if (PREFIX(p, "^fg(") || PREFIX(p, "^bg(")) {
+      argstart = strchr(p, '(') + 1;
+      argend = strchr(argstart, ')');
+      if (!argend) { /* ignore this command */
+        p = argstart - 1;
+        continue;
+      }
+
+      *p = '\0';
+      iw = TEXTW(m, itext) - m->lrpad;
+      if (*itext) /* only draw text if there is something to draw */
+        x = drwl_text(m->drw, x, 0, iw, m->b.height, 0, itext, 0);
+      *p = '^';
+
+      if (PREFIX(p, "^fg("))
+        color = &scheme[0];
+      else
+        color = &scheme[1];
+
+      if (argend != argstart) {
+        *argend = '\0';
+        *color = strtoul(argstart, NULL, 16);
+        *color = *color << 8 | 0xff; /* add alpha channel */
+        *argend = ')';
+      } else {
+        *color = 0; /* reset */
+      }
+
+      /* reset color back to normal if none was provided */
+      if (!scheme[0])
+        scheme[0] = colors[SchemeNorm][0];
+      if (!scheme[1])
+        scheme[1] = colors[SchemeNorm][1];
+
+      itext = argend + 1;
+      drwl_setscheme(m->drw, scheme);
+      p = argend;
+    }
+  }
+  iw = TEXTW(m, itext) - m->lrpad;
+  if (*itext)
+    drwl_text(m->drw, x, 0, iw, m->b.height, 0, itext, 0);
+
+  return tw;
 }
 
 void focusclient(Client *c, int lift) {
