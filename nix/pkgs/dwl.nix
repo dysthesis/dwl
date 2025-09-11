@@ -14,6 +14,7 @@
   fcft,
   tllist,
   wlroots,
+  wlroots_0_19 ? null,
   # X stack (autopassed by callPackage)
   xorg ? null,
   libX11 ? null,
@@ -78,20 +79,30 @@ stdenv.mkDerivation {
     installShellFiles
   ];
 
-  buildInputs = [
-    libinput
-    libxcb
-    libxkbcommon
-    pixman
-    wayland
-    wayland-protocols
-    wlroots
-    # bar patch
-    fcft
-    tllist
-    libdrm
-  ]
-  ++ xDeps;
+  buildInputs =
+    let
+      wlrootsPkg =
+        if wlroots_0_19 != null then
+          wlroots_0_19
+        else if wlroots != null then
+          wlroots
+        else
+          throw "dwl: no wlroots package found (expected wlroots_0_19 or wlroots)";
+    in
+    [
+      libinput
+      libxcb
+      libxkbcommon
+      pixman
+      wayland
+      wayland-protocols
+      wlrootsPkg
+      # bar patch
+      fcft
+      tllist
+      libdrm
+    ]
+    ++ xDeps;
 
   # Ensure installation under $out and point scanner directly
   makeFlags = xMakeFlags ++ [
