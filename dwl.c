@@ -938,7 +938,7 @@ void bufrelease(struct wl_listener *listener, void *data) {
 }
 
 void buttonpress(struct wl_listener *listener, void *data) {
-  unsigned int i = 0, x = 0;
+  unsigned int i = 0, x = 0, occ = 0;
   double cx;
   unsigned int click;
   struct wlr_pointer_button_event *event = data;
@@ -970,9 +970,16 @@ void buttonpress(struct wl_listener *listener, void *data) {
         (buffer = wlr_scene_buffer_from_node(node)) &&
         buffer == selmon->scene_buffer) {
       cx = (cursor->x - selmon->m.x - sidepad) * selmon->wlr_output->scale;
-      do
+      wl_list_for_each(c, &clients, link) {
+        if (c->mon != selmon)
+          continue;
+        occ |= c->tags == TAGMASK ? 0 : c->tags;
+      }
+      do {
+        if (!(occ & 1u << i || selmon->tagset[selmon->seltags] & 1u << i))
+          continue;
         x += TEXTW(selmon, tags[i]);
-      while (cx >= x && ++i < LENGTH(tags));
+      } while (cx >= x && ++i < LENGTH(tags));
       if (i < LENGTH(tags)) {
         click = ClkTagBar;
         arg.ui = 1u << i;
@@ -1801,20 +1808,18 @@ void drawbar(Monitor *m) {
   wl_list_for_each(c, &clients, link) {
     if (c->mon != m)
       continue;
-    occ |= c->tags;
+    occ |= c->tags == TAGMASK ? 0 : c->tags;
     if (c->isurgent)
       urg |= c->tags;
   }
   x = 0;
   c = focustop(m);
   for (i = 0; i < LENGTH(tags); i++) {
+    if (!(occ & 1u << i || m->tagset[m->seltags] & 1u << i))
+      continue;
     w = TEXTW(m, tags[i]);
     drwl_setscheme(m->drw, colors[m->tagset[m->seltags] & 1u << i ? SchemeSel : SchemeNorm]);
     drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, tags[i], urg & 1u << i);
-    if (occ & 1u << i)
-      drwl_rect(m->drw, x + boxs, boxs, boxw, boxw,
-                m == selmon && c && (c->tags & 1u << i),
-                urg & 1u << i);
     x += w;
   }
   w = TEXTW(m, m->ltsymbol);
