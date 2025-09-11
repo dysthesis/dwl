@@ -26,17 +26,20 @@
 
 let
   # Render a C string literal from a Nix string
-  escapeCStr = s: lib.replaceStrings [ "\\"  "\""  "\n"  "\t" ] [ "\\\\" "\\\"" "\\n" "\\t" ] s;
+  escapeCStr = s: lib.replaceStrings [ "\\" "\"" "\n" "\t" ] [ "\\\\" "\\\"" "\\n" "\\t" ] s;
   quoteC = s: "\"${escapeCStr s}\"";
   renderCmd = cmd: "  " + (lib.concatStringsSep ", " (map quoteC cmd)) + ", NULL,";
-  renderAutostart = cmds:
+  renderAutostart =
+    cmds:
     let
       lines = map renderCmd cmds;
       body = lib.concatStringsSep "\n" lines;
       nl = lib.optionalString (cmds != [ ]) "\n";
-    in ''static const char *const autostart[] = {
-${body}${nl}  NULL /* terminate */
-};'';
+    in
+    ''
+      static const char *const autostart[] = {
+      ${body}${nl}  NULL /* terminate */
+      };'';
 
   wlrootsPkg =
     if wlroots_0_19 != null then
@@ -104,35 +107,37 @@ stdenv.mkDerivation rec {
 
   # Optionally inject autostart block into config.h prior to build/scan-build
   postPatch = lib.optionalString (autostart != null) (
-    let block = renderAutostart autostart; in
+    let
+      block = renderAutostart autostart;
+    in
     # sh
     ''
-      echo "Injecting autostart into config.h"
-      # Ensure a config.h exists to patch
-      if [ ! -f config.h ]; then
-        cp config.def.h config.h
-      fi
+            echo "Injecting autostart into config.h"
+            # Ensure a config.h exists to patch
+            if [ ! -f config.h ]; then
+              cp config.def.h config.h
+            fi
 
-      cat > autostart.block << 'EOF'
-${block}
-EOF
+            cat > autostart.block << 'EOF'
+      ${block}
+      EOF
 
-      # Find range for the existing autostart[] block and replace it atomically
-      startline=$(grep -n -E '^static const char \*const autostart\[\] = \{$' config.h | cut -d: -f1)
-      if [ -z "$startline" ]; then
-        echo "error: could not find autostart[] in config.h" >&2
-        exit 1
-      fi
-      endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/ { print NR; exit }' config.h)
-      if [ -z "$endline" ]; then
-        echo "error: could not find end of autostart[] block in config.h" >&2
-        exit 1
-      fi
+            # Find range for the existing autostart[] block and replace it atomically
+            startline=$(grep -n -E '^static const char \*const autostart\[\] = \{$' config.h | cut -d: -f1)
+            if [ -z "$startline" ]; then
+              echo "error: could not find autostart[] in config.h" >&2
+              exit 1
+            fi
+            endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/ { print NR; exit }' config.h)
+            if [ -z "$endline" ]; then
+              echo "error: could not find end of autostart[] block in config.h" >&2
+              exit 1
+            fi
 
-      head -n "$((startline - 1))" config.h > config.h.new
-      cat autostart.block >> config.h.new
-      tail -n "+$((endline + 1))" config.h >> config.h.new
-      mv config.h.new config.h
+            head -n "$((startline - 1))" config.h > config.h.new
+            cat autostart.block >> config.h.new
+            tail -n "+$((endline + 1))" config.h >> config.h.new
+            mv config.h.new config.h
     ''
   );
 
