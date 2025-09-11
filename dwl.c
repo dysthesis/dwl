@@ -713,6 +713,7 @@ void arrange(Monitor *m) {
                              (c = focustop(m)) && c->isfullscreen);
 
   strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof(m->ltsymbol));
+  m->ltsymbol[sizeof(m->ltsymbol) - 1] = '\0';
 
   /* We move all clients (except fullscreen and unmanaged) to LyrTile while
    * in floating layout to avoid "real" floating clients be always on top */
@@ -849,6 +850,7 @@ void autostartexec(void) {
   for (p = autostart; *p; i++, p++) {
     if ((autostart_pids[i] = fork()) == 0) {
       setsid();
+      /* flawfinder: ignore (intentional program exec; argv is from trusted config.h) */
       execvp(*p, (char *const *)p);
       die("dwl: execvp %s:", *p);
     }
@@ -1466,6 +1468,7 @@ void createmon(struct wl_listener *listener, void *data) {
       m->m.x = r->x;
       m->m.y = r->y;
       strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof(m->ltsymbol));
+      m->ltsymbol[sizeof(m->ltsymbol) - 1] = '\0';
       wlr_output_state_set_scale(&state, r->scale);
       wlr_output_state_set_transform(&state, r->rr);
       break;
@@ -1856,21 +1859,43 @@ static int drawstatus(Monitor *m) {
   uint32_t scheme[3], *color;
 
   /* calculate real width of stext */
+  size_t rpos = 0;
+  size_t rcap = sizeof(rstext);
   for (p = stext; *p; p++) {
     if (PREFIX(p, "^^")) {
-      strncat(rstext, p, 2);
+      if (rcap > 1) {
+        size_t n = 2;
+        if (n > rcap - 1)
+          n = rcap - 1;
+        memcpy(rstext + rpos, p, n);
+        rpos += n;
+        rstext[rpos] = '\0';
+        rcap = sizeof(rstext) - rpos;
+      }
       p++;
     } else if (PREFIX(p, "^fg(") || PREFIX(p, "^bg(")) {
       argend = strchr(p, ')');
       if (!argend) { /* ignore this command */
         argstart = strchr(p, '(') + 1;
-        strncat(rstext, p, argstart - p);
+        if (rcap > 1) {
+          size_t n = (size_t)(argstart - p);
+          if (n > rcap - 1)
+            n = rcap - 1;
+          memcpy(rstext + rpos, p, n);
+          rpos += n;
+          rstext[rpos] = '\0';
+          rcap = sizeof(rstext) - rpos;
+        }
         p = argstart - 1;
       } else {
         p = argend;
       }
     } else {
-      strncat(rstext, p, 1);
+      if (rcap > 1) {
+        rstext[rpos++] = *p;
+        rstext[rpos] = '\0';
+        rcap = sizeof(rstext) - rpos;
+      }
     }
   }
   tw = TEXTW(m, rstext) - m->lrpad;
@@ -2897,6 +2922,7 @@ void run(char *startup_cmd) {
       setsid();
       close(piperw[0]);
       close(piperw[1]);
+      /* flawfinder: ignore (intentional shell invocation; startup_cmd comes from CLI flag or wlroots environment) */
       execl("/bin/sh", "/bin/sh", "-c", startup_cmd, NULL);
       die("startup: execl:");
     }
@@ -3011,6 +3037,7 @@ void setlayout(const Arg *arg) {
             (Layout *)arg->v;
   strncpy(selmon->ltsymbol, selmon->lt[selmon->sellt]->symbol,
           sizeof(selmon->ltsymbol));
+  selmon->ltsymbol[sizeof(selmon->ltsymbol) - 1] = '\0';
   if (!selmon->lt[selmon->sellt]->arrange) {
     /* floating layout, draw borders around all clients */
     Client *c;
@@ -3332,6 +3359,7 @@ void spawn(const Arg *arg) {
     close(STDIN_FILENO);
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
+    /* flawfinder: ignore (intentional program exec; argv is from trusted keybindings) */
     execvp(((char **)arg->v)[0], (char **)arg->v);
     die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
   }
@@ -3341,6 +3369,7 @@ void spawnscratch(const Arg *arg) {
   if (fork() == 0) {
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
+    /* flawfinder: ignore (intentional program exec; argv is from trusted keybindings) */
     execvp(((char **)arg->v)[1], ((char **)arg->v) + 1);
     die("dwl: execvp %s failed:", ((char **)arg->v)[1]);
   }
@@ -3373,6 +3402,7 @@ int statusin(int fd, unsigned int mask, void *data) {
   status[strcspn(status, "\n")] = '\0';
 
   strncpy(stext, status, sizeof(stext));
+  stext[sizeof(stext) - 1] = '\0';
   drawbars();
 
   return 0;
@@ -3783,6 +3813,7 @@ void updatemons(struct wl_listener *listener, void *data) {
 
   if (stext[0] == '\0')
     strncpy(stext, "dwl-" VERSION, sizeof(stext));
+  stext[sizeof(stext) - 1] = '\0';
   wl_list_for_each(m, &mons, link) {
     updatebar(m);
     drawbar(m);
@@ -4113,6 +4144,7 @@ int main(int argc, char *argv[]) {
   char *startup_cmd = NULL;
   int c;
 
+  /* flawfinder: ignore (getopt is standard and bounded by argv; our use is safe) */
   while ((c = getopt(argc, argv, "s:hdv")) != -1) {
     if (c == 's')
       startup_cmd = optarg;
@@ -4127,6 +4159,7 @@ int main(int argc, char *argv[]) {
     goto usage;
 
   /* Wayland requires XDG_RUNTIME_DIR for creating its communications socket */
+  /* flawfinder: ignore (environment var checked for presence only) */
   if (!getenv("XDG_RUNTIME_DIR"))
     die("XDG_RUNTIME_DIR must be set");
   setup();

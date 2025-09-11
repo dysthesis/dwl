@@ -1,6 +1,5 @@
 _: {
-  perSystem =
-    { config, pkgs, ... }:
+  perSystem = { config, pkgs, ... }:
     let
       # Helper to gather common build inputs for C checks
       commonBuildInputs = with pkgs; [
@@ -15,45 +14,38 @@ _: {
         fcft
       ];
 
-      xDeps = with pkgs.xorg; [
-        libxcb
-        xcbutilwm
-      ];
+      xDeps = with pkgs.xorg; [ libxcb xcbutilwm ];
 
       # Flawfinder source scan (quick SAST over C sources)
-      mkFlawfinder =
-        pkgs.runCommand "flawfinder-check"
-          {
-            buildInputs = [
-              pkgs.flawfinder
-              pkgs.findutils
-              pkgs.coreutils
-            ];
-            src = pkgs.lib.cleanSource ../.;
-          }
-          ''
-            set -euo pipefail
-            mkdir -p "$out"
-            # Run text report first; we’ll parse hit count to decide pass/fail
-            flawfinder \
-              --minlevel=3 \
-              --columns --context \
-              "$src" > "$out/report.txt"
+      mkFlawfinder = pkgs.runCommand "flawfinder-check" {
+        buildInputs = [ pkgs.flawfinder pkgs.findutils pkgs.coreutils ];
+        src = pkgs.lib.cleanSource ../.;
+      } ''
+          set -euo pipefail
+          mkdir -p "$out"
+          # Run text report first; we’ll parse hit count to decide pass/fail
+          flawfinder \
+            --minlevel=3 \
+            --columns --context \
+            "$src" > "$out/report.txt"
 
-            # Optional HTML report for easier browsing
-            flawfinder \
-              --minlevel=3 \
-              --html "$src" > "$out/report.html" || true
+          # Optional HTML report for easier browsing
+          flawfinder \
+            --minlevel=3 \
+            --html "$src" > "$out/report.html" || true
 
-            # Do not fail the check on findings for now; surface reports only
-            # (we can tighten this later once triaged or with a baseline)
-          '';
+        # Fail the check if any hits are found to keep security hygiene tight
+        hits=$(${
+          pkgs.gawk or pkgs.awk
+        }/bin/awk '/Hits =/{n=$3} END{print n+0}' "$out/report.txt")
+        if [ "$hits" -gt 0 ]; then
+          echo "Flawfinder found $hits issue(s) (see $out/report.txt)" >&2
+          exit 1
+        fi
+      '';
 
       # Facebook Infer static analysis (capture + analyze Make build)
-      mkInfer =
-        {
-          enableXWayland ? false,
-        }:
+      mkInfer = { enableXWayland ? false, }:
         pkgs.stdenv.mkDerivation {
           pname = "dwl-infer";
           version = "1";
@@ -63,9 +55,10 @@ _: {
             pkgs.wayland-scanner
             pkgs.clang
             pkgs.gnumake
-          ]
-          ++ pkgs.lib.optionals (pkgs ? infer) [ pkgs.infer ];
-          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+            pkgs.infer
+          ];
+          buildInputs = commonBuildInputs
+            ++ pkgs.lib.optionals enableXWayland xDeps;
           dontConfigure = true;
           buildPhase = ''
             set -euo pipefail
@@ -103,10 +96,7 @@ _: {
         };
 
       # cppcheck static analysis
-      mkCppcheck =
-        {
-          enableXWayland ? false,
-        }:
+      mkCppcheck = { enableXWayland ? false, }:
         pkgs.stdenv.mkDerivation {
           pname = "dwl-cppcheck";
           version = "1";
@@ -119,7 +109,8 @@ _: {
             coreutils
             findutils
           ];
-          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          buildInputs = commonBuildInputs
+            ++ pkgs.lib.optionals enableXWayland xDeps;
           dontConfigure = true;
           buildPhase = ''
             set -euo pipefail
@@ -133,7 +124,9 @@ _: {
               xdg-shell-protocol.h
 
             echo "Collecting include/define flags..."
-            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"}"
+            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${
+              pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"
+            }"
             # Prefer wlroots-0.19 but fall back to wlroots if needed
             if ${pkgs.pkg-config}/bin/pkg-config --exists wlroots-0.19; then
               WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots-0.19)
@@ -170,10 +163,7 @@ _: {
         };
 
       # clang-tidy static analysis (clang-analyzer checks)
-      mkClangTidy =
-        {
-          enableXWayland ? false,
-        }:
+      mkClangTidy = { enableXWayland ? false, }:
         pkgs.stdenv.mkDerivation {
           pname = "dwl-clang-tidy";
           version = "1";
@@ -187,7 +177,8 @@ _: {
             coreutils
             findutils
           ];
-          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          buildInputs = commonBuildInputs
+            ++ pkgs.lib.optionals enableXWayland xDeps;
           dontConfigure = true;
           buildPhase = ''
             set -euo pipefail
@@ -201,7 +192,9 @@ _: {
               xdg-shell-protocol.h
 
             echo "Collecting include/define flags..."
-            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"}"
+            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${
+              pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"
+            }"
             if ${pkgs.pkg-config}/bin/pkg-config --exists wlroots-0.19; then
               WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots-0.19)
             else
@@ -239,10 +232,7 @@ _: {
           '';
         };
 
-      mkScanBuild =
-        {
-          enableXWayland ? false,
-        }:
+      mkScanBuild = { enableXWayland ? false, }:
         pkgs.stdenv.mkDerivation {
           pname = "dwl-scan-build-check";
           version = "1";
@@ -254,7 +244,8 @@ _: {
             clang-analyzer
             gnumake
           ];
-          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          buildInputs = commonBuildInputs
+            ++ pkgs.lib.optionals enableXWayland xDeps;
           dontConfigure = true;
           buildPhase = ''
             echo "Running clang-analyzer (scan-build) with status-bugs..."
@@ -281,73 +272,60 @@ _: {
 
       # Build a clang-based dwl with ASan+UBSan (+frame-pointers) and run a simple
       # headless smoke test to exercise basic compositor/client paths.
-      mkAsanUbsanRun =
-        {
-          enableXWayland ? false,
-        }:
+      mkAsanUbsanRun = { enableXWayland ? false, }:
         let
-          sanPkg =
-            (pkgs.callPackage ./pkgs/dwl.nix {
-              stdenv = pkgs.clangStdenv;
-              inherit enableXWayland;
-              inherit (pkgs) xorg;
-              # Disable repo autostart to avoid unknown commands in CI
-              autostart = [ ];
-            }).overrideAttrs
-              (prev: {
-                makeFlags = (prev.makeFlags or [ ]) ++ [
-                  "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
-                  "LDFLAGS+=-fsanitize=address,undefined"
-                ];
-                __structuredAttrs = true;
-              });
-        in
-        pkgs.runCommand "dwl-asan-ubsan-smoketest"
-          {
-            buildInputs = [
-              sanPkg
-              pkgs.coreutils
-              pkgs.bash
-              pkgs.toybox
-              pkgs.foot
-              pkgs.wmenu
+          sanPkg = (pkgs.callPackage ./pkgs/dwl.nix {
+            stdenv = pkgs.clangStdenv;
+            inherit enableXWayland;
+            inherit (pkgs) xorg;
+            # Disable repo autostart to avoid unknown commands in CI
+            autostart = [ ];
+          }).overrideAttrs (prev: {
+            makeFlags = (prev.makeFlags or [ ]) ++ [
+              "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+              "LDFLAGS+=-fsanitize=address,undefined"
             ];
-          }
-          ''
-            set -euo pipefail
-            export ASAN_OPTIONS=detect_leaks=0:strict_init_order=1:abort_on_error=1
-            export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1
-            export XDG_RUNTIME_DIR="$PWD/xdg"
-            mkdir -p "$XDG_RUNTIME_DIR"
-            chmod 700 "$XDG_RUNTIME_DIR"
-            export WLR_BACKENDS=headless
-            export WLR_RENDERER_ALLOW_SOFTWARE=1
-            # Exercise client create/map/unmap and compositor run loop.
-            # - Start dwl with a startup script that launches a couple of clients
-            #   and then exits successfully, while we still guard with timeout.
-            ${pkgs.coreutils}/bin/timeout 8s ${sanPkg}/bin/dwl -s \
-              "${pkgs.bash}/bin/bash -ceu ' \
-                 (${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &) ; \
-                 (printf %s\\n x | ${pkgs.wmenu}/bin/wmenu -p test >/dev/null 2>&1 &) ; \
-                 sleep 1 ; exit 0 '" || true
-            touch "$out"
-          '';
+            __structuredAttrs = true;
+          });
+        in pkgs.runCommand "dwl-asan-ubsan-smoketest" {
+          buildInputs = [
+            sanPkg
+            pkgs.coreutils
+            pkgs.bash
+            pkgs.toybox
+            pkgs.foot
+            pkgs.wmenu
+          ];
+        } ''
+          set -euo pipefail
+          export ASAN_OPTIONS=detect_leaks=0:strict_init_order=1:abort_on_error=1
+          export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1
+          export XDG_RUNTIME_DIR="$PWD/xdg"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          export WLR_BACKENDS=headless
+          export WLR_RENDERER_ALLOW_SOFTWARE=1
+          # Exercise client create/map/unmap and compositor run loop.
+          # - Start dwl with a startup script that launches a couple of clients
+          #   and then exits successfully, while we still guard with timeout.
+          ${pkgs.coreutils}/bin/timeout 8s ${sanPkg}/bin/dwl -s \
+            "${pkgs.bash}/bin/bash -ceu ' \
+               (${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &) ; \
+               (printf %s\\n x | ${pkgs.wmenu}/bin/wmenu -p test >/dev/null 2>&1 &) ; \
+               sleep 1 ; exit 0 '" || true
+          touch "$out"
+        '';
 
       # Strict warnings-as-errors build using a curated warning set
-      mkWarningsStrict =
-        {
-          enableXWayland ? false,
-        }:
+      mkWarningsStrict = { enableXWayland ? false, }:
         let
           base = pkgs.callPackage ./pkgs/dwl.nix {
             stdenv = pkgs.clangStdenv;
             inherit enableXWayland;
             inherit (pkgs) xorg;
           };
-        in
-        base.overrideAttrs (prev: {
-          NIX_CFLAGS_COMPILE =
-            (prev.NIX_CFLAGS_COMPILE or "")
+        in base.overrideAttrs (prev: {
+          NIX_CFLAGS_COMPILE = (prev.NIX_CFLAGS_COMPILE or "")
             + " -Wall -Wextra -Werror -Wformat=2 -Wvla -Wshadow -Wcast-align"
             + " -Wpointer-arith -Wstrict-prototypes -Wconversion -Wsign-conversion"
             + " -Wno-unused-parameter -Wno-implicit-int-conversion -Wno-implicit-int-float-conversion"
@@ -355,7 +333,8 @@ _: {
         });
 
       # Strict Clang build (treat warnings as errors)
-      clangWerror = pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.clangStdenv; };
+      clangWerror =
+        pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.clangStdenv; };
 
       # Strict Clang build (XWayland)
       clangWerrorX = pkgs.callPackage ./pkgs/dwl.nix {
@@ -365,7 +344,8 @@ _: {
       };
 
       # Strict GCC build with -fanalyzer
-      gccFanalyzer = pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.gccStdenv; };
+      gccFanalyzer =
+        pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.gccStdenv; };
 
       # Strict GCC build with -fanalyzer (XWayland)
       gccFanalyzerX = pkgs.callPackage ./pkgs/dwl.nix {
@@ -373,13 +353,12 @@ _: {
         enableXWayland = true;
         inherit (pkgs) xorg;
       };
-      inferChecks = pkgs.lib.optionalAttrs (pkgs ? infer) {
+      inferChecks = {
         # Facebook Infer static analysis (capture build + analyze)
         infer = mkInfer { enableXWayland = false; };
         infer-xwayland = mkInfer { enableXWayland = true; };
       };
-    in
-    {
+    in {
       checks = {
         # Build the default package (ensures normal build stays green)
         build = config.packages.dwl;
@@ -414,93 +393,72 @@ _: {
         warnings-strict-xwayland = mkWarningsStrict { enableXWayland = true; };
 
         clang-werror = clangWerror.overrideAttrs (prev: {
-          NIX_CFLAGS_COMPILE =
-            (prev.NIX_CFLAGS_COMPILE or "") + " -Werror -Wformat -Wformat-security -Wundef";
+          NIX_CFLAGS_COMPILE = (prev.NIX_CFLAGS_COMPILE or "")
+            + " -Werror -Wformat -Wformat-security -Wundef";
         });
         clang-werror-xwayland = clangWerrorX.overrideAttrs (prev: {
-          NIX_CFLAGS_COMPILE =
-            (prev.NIX_CFLAGS_COMPILE or "") + " -Werror -Wformat -Wformat-security -Wundef";
+          NIX_CFLAGS_COMPILE = (prev.NIX_CFLAGS_COMPILE or "")
+            + " -Werror -Wformat -Wformat-security -Wundef";
         });
 
         gcc-fanalyzer = gccFanalyzer.overrideAttrs (prev: {
-          NIX_CFLAGS_COMPILE =
-            (prev.NIX_CFLAGS_COMPILE or "") + " -fanalyzer -Werror -Wformat -Wformat-security";
+          NIX_CFLAGS_COMPILE = (prev.NIX_CFLAGS_COMPILE or "")
+            + " -fanalyzer -Werror -Wformat -Wformat-security";
         });
         gcc-fanalyzer-xwayland = gccFanalyzerX.overrideAttrs (prev: {
-          NIX_CFLAGS_COMPILE =
-            (prev.NIX_CFLAGS_COMPILE or "") + " -fanalyzer -Werror -Wformat -Wformat-security";
+          NIX_CFLAGS_COMPILE = (prev.NIX_CFLAGS_COMPILE or "")
+            + " -fanalyzer -Werror -Wformat -Wformat-security";
         });
 
         # Nix code hygiene
-        nixfmt =
-          pkgs.runCommand "nixfmt-check"
-            {
-              buildInputs = [
-                pkgs.nixfmt
-                pkgs.findutils
-              ];
-              src = pkgs.lib.cleanSource ../.;
-            }
-            ''
-              echo "Checking Nix formatting with nixfmt..."
-              files=$(find "$src" -type f -name '*.nix' ! -path "$src/nix/checks.nix")
-              if [ -n "$files" ]; then
-                nixfmt --check $files
-              fi
-              touch $out
-            '';
+        nixfmt = pkgs.runCommand "nixfmt-check" {
+          buildInputs = [ pkgs.nixfmt pkgs.findutils ];
+          src = pkgs.lib.cleanSource ../.;
+        } ''
+          echo "Checking Nix formatting with nixfmt..."
+          files=$(find "$src" -type f -name '*.nix')
+          if [ -n "$files" ]; then
+            nixfmt --check $files
+          fi
+          touch $out
+        '';
 
-        statix =
-          pkgs.runCommand "statix-check"
-            {
-              buildInputs = [ pkgs.statix ];
-              src = pkgs.lib.cleanSource ../.;
-            }
-            ''
-              echo "Running statix..."
-              statix check "$src"
-              touch $out
-            '';
+        statix = pkgs.runCommand "statix-check" {
+          buildInputs = [ pkgs.statix ];
+          src = pkgs.lib.cleanSource ../.;
+        } ''
+          echo "Running statix..."
+          statix check "$src"
+          touch $out
+        '';
 
-        deadnix =
-          pkgs.runCommand "deadnix-check"
-            {
-              buildInputs = [ pkgs.deadnix ];
-              src = pkgs.lib.cleanSource ../.;
-            }
-            ''
-              echo "Running deadnix..."
-              deadnix --fail "$src"
-              touch $out
-            '';
+        deadnix = pkgs.runCommand "deadnix-check" {
+          buildInputs = [ pkgs.deadnix ];
+          src = pkgs.lib.cleanSource ../.;
+        } ''
+          echo "Running deadnix..."
+          deadnix --fail "$src"
+          touch $out
+        '';
 
         # Manpage lint (helpful to keep docs tidy)
         # Include referenced manpages in MANPATH so cross-references resolve,
         # and do not suppress mandoc output to ease debugging in CI logs.
-        man-lint =
-          pkgs.runCommand "man-lint"
-            {
-              # Keep mandoc minimal, but add common refs used in dwl.1 so Xr checks pass.
-              buildInputs = [
-                pkgs.mandoc
-                pkgs.foot
-                pkgs.wmenu
-                pkgs.dwm
-                pkgs.xkeyboard_config
-              ];
-              src = pkgs.lib.cleanSource ../.;
-            }
-            ''
-              set -euo pipefail
-              echo "Linting manpage with mandoc..."
-              # Work on a local copy to avoid odd path parsing in mandoc
-              cp "$src/dwl.1" ./dwl.1
-              # Ensure cross-references can be resolved by mandoc
-              export MANPATH="${pkgs.foot}/share/man:${pkgs.wmenu}/share/man:${pkgs.dwm}/share/man:${pkgs.xkeyboard_config}/share/man"
-              mandoc -Tlint -Werror ./dwl.1
-              touch $out
-            '';
-      }
-      // inferChecks;
+        man-lint = pkgs.runCommand "man-lint" {
+          # Keep mandoc minimal, but add common refs used in dwl.1 so Xr checks pass.
+          buildInputs =
+            [ pkgs.mandoc pkgs.foot pkgs.wmenu pkgs.dwm pkgs.xkeyboard_config ];
+          src = pkgs.lib.cleanSource ../.;
+        } ''
+          set -euo pipefail
+          echo "Linting manpage with mandoc..."
+          # Work on a local copy to avoid odd path parsing in mandoc
+          cp "$src/dwl.1" ./dwl.1
+          # Ensure cross-references can be resolved by mandoc
+          export MANPATH="${pkgs.foot}/share/man:${pkgs.wmenu}/share/man:${pkgs.dwm}/share/man:${pkgs.xkeyboard_config}/share/man"
+          mandoc -Tlint -Werror ./dwl.1
+          touch $out
+        '';
+      } // inferChecks;
     };
 }
