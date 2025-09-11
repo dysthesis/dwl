@@ -9,6 +9,9 @@ static const int bypass_surface_visibility =
           surface isn't visible  */
 static const int smartborders = 1;
 static const unsigned int borderpx = 1; /* border pixel of windows */
+static const int showbar = 1; /* 0 means no bar */
+static const int topbar = 1;  /* 0 means bottom bar */
+static const char *fonts[] = {"monospace:size=10"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
 static const float focuscolor[] = COLOR(0xffffffff);
@@ -20,6 +23,12 @@ static const char cursor_size[] =
  * behavior */
 static const float fullscreen_bg[] = {0.0f, 0.0f, 0.0f,
                                       1.0f}; /* You can also use glsl colors */
+static uint32_t colors[][3] = {
+    /*               fg          bg          border    */
+    [SchemeNorm] = {0xbbbbbbff, 0x222222ff, 0x444444ff},
+    [SchemeSel] = {0xeeeeeeff, 0x005577ff, 0x005577ff},
+    [SchemeUrg] = {0, 0, 0x770000ff},
+};
 static int enableautoswallow =
     1; /* enables autoswallowing newly spawned clients */
 static float swallowborder = 1.0f; /* add this multiplied by borderpx to border
@@ -30,6 +39,7 @@ static const int respect_monitor_reserved_area =
 
 /* tagging - TAGCOUNT must be no greater than 31 */
 #define TAGCOUNT (9)
+static char *tags[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
 /* logging */
 static int log_level = WLR_ERROR;
@@ -298,7 +308,15 @@ static const Key keys[] = {
 };
 
 static const Button buttons[] = {
-    {MODKEY, BTN_LEFT, moveresize, {.ui = CurMove}},
-    {MODKEY, BTN_MIDDLE, togglefloating, {0}},
-    {MODKEY, BTN_RIGHT, moveresize, {.ui = CurResize}},
+    {ClkLtSymbol, 0, BTN_LEFT, setlayout, {.v = &layouts[0]}},
+    {ClkLtSymbol, 0, BTN_RIGHT, setlayout, {.v = &layouts[2]}},
+    {ClkTitle, 0, BTN_MIDDLE, zoom, {0}},
+    {ClkStatus, 0, BTN_MIDDLE, spawn, {.v = termcmd}},
+    {ClkClient, MODKEY, BTN_LEFT, moveresize, {.ui = CurMove}},
+    {ClkClient, MODKEY, BTN_MIDDLE, togglefloating, {0}},
+    {ClkClient, MODKEY, BTN_RIGHT, moveresize, {.ui = CurResize}},
+    {ClkTagBar, 0, BTN_LEFT, view, {0}},
+    {ClkTagBar, 0, BTN_RIGHT, toggleview, {0}},
+    {ClkTagBar, MODKEY, BTN_LEFT, tag, {0}},
+    {ClkTagBar, MODKEY, BTN_RIGHT, toggletag, {0}},
 };

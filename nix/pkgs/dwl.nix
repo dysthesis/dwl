@@ -1,6 +1,7 @@
 {
   lib,
   stdenv,
+  installShellFiles,
   pkg-config,
   wayland,
   wayland-protocols,
@@ -8,10 +9,11 @@
   libxkbcommon,
   pixman,
   libdrm,
-  seatd,
+  libxcb,
   wayland-scanner,
-  wlroots_0_19 ? null,
-  wlroots ? null,
+  fcft,
+  tllist,
+  wlroots,
   # X stack (autopassed by callPackage)
   xorg ? null,
   libX11 ? null,
@@ -41,14 +43,6 @@ let
       ${body}${nl}  NULL /* terminate */
       };'';
 
-  wlrootsPkg =
-    if wlroots_0_19 != null then
-      wlroots_0_19
-    else if wlroots != null then
-      wlroots
-    else
-      throw "dwl: no wlroots package found (expected wlroots_0_19 or wlroots)";
-
   xDeps =
     if enableXWayland then
       [
@@ -69,7 +63,7 @@ let
     else
       [ ];
 in
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "dwl";
   # Keep in sync with config.mk's _VERSION default; the runtime binary also embeds VERSION.
   version = "0.8-dev";
@@ -81,17 +75,21 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [
     pkg-config
     wayland-scanner
+    installShellFiles
   ];
 
   buildInputs = [
-    wayland # wayland-server
-    wlrootsPkg
     libinput
+    libxcb
     libxkbcommon
     pixman
-    libdrm
-    seatd
+    wayland
     wayland-protocols
+    wlroots
+    # bar patch
+    fcft
+    tllist
+    libdrm
   ]
   ++ xDeps;
 

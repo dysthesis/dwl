@@ -16,6 +16,7 @@ _: {
         libdrm
         seatd
         wayland-protocols
+        fcft
       ];
 
       xDeps = with pkgs.xorg; [
