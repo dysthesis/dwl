@@ -10,9 +10,6 @@
   libdrm,
   seatd,
   wayland-scanner,
-  # Optional: static analyzer tooling
-  clang-analyzer,
-  clang ? null,
   wlroots_0_19 ? null,
   wlroots ? null,
   xorg ? null,
@@ -75,9 +72,7 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [
     pkg-config
     wayland-scanner
-    clang-analyzer
-  ]
-  ++ lib.optionals (clang != null) [ clang ];
+  ];
 
   buildInputs = [
     wayland # wayland-server
@@ -130,21 +125,6 @@ EOF
       mv config.h.new config.h
     ''
   );
-
-  # Run clang static analyzer prior to actual compilation. If available,
-  # this will fail the build when bugs are detected (status-bugs).
-  preBuild = # sh
-    ''
-      echo "Running clang-analyzer (scan-build) prior to compilation..."
-      export CC="${if clang != null then "${clang}/bin/clang" else "cc"}"
-      export CXX="${if clang != null then "${clang}/bin/clang++" else "c++"}"
-      "${clang-analyzer}/bin/scan-build" \
-        --status-bugs \
-        --use-cc="$CC" \
-        --use-c++="$CXX" \
-        -o "$TMPDIR/scan-build" \
-        make ${lib.concatStringsSep " " makeFlags}
-    '';
 
   # No tests provided
   doCheck = false;

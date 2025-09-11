@@ -14,6 +14,7 @@
         ./nix/packages.nix
         ./nix/devshells.nix
         ./nix/apps.nix
+        ./nix/checks.nix
       ];
       systems = import systems;
     });
