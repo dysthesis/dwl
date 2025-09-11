@@ -15,7 +15,7 @@ static const float focuscolor[] = COLOR(0xffffffff);
 static const float urgentcolor[] = COLOR(0xffaa88ff);
 static const char *cursor_theme = "Bibata-Modern-Classic";
 static const char cursor_size[] =
-    "24"; /* Make sure it's a valid integer, otherwise things will break */
+    "18"; /* Make sure it's a valid integer, otherwise things will break */
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old
  * behavior */
 static const float fullscreen_bg[] = {0.0f, 0.0f, 0.0f,
