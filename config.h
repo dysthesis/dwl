@@ -9,6 +9,7 @@ static const int bypass_surface_visibility =
           surface isn't visible  */
 static const int smartborders = 1;
 static const unsigned int borderpx = 1; /* border pixel of windows */
+static const int user_bh = 24; /* 0 means that dwl will calculate barheight, >= 1 means dwl will use user_bh as the bar height. */
 static const int showbar = 1; /* 0 means no bar */
 static const int topbar = 0;  /* 0 means bottom bar */
 static const int centeredtitle = 1; /* 1 means centered title */
