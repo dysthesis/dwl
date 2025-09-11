@@ -202,11 +202,21 @@ static const char *taskscratch[] = {"d",
                                     "taskwarrior-tui",
                                     NULL};
 static const char *signalscratch[] = {"s", "signal-desktop", NULL};
+
+const char *raisevol[] = { "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL, };
+const char *lowervol[] = {"wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-", NULL}; 
+const char *raisebright[] = {"brightnessctl", "set", "5%+", NULL};
+const char *lowerbright[] = {"brightnessctl", "set", "5%-", NULL};
+
 static const Key keys[] = {
     /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
     /* modifier                  key                 function        argument */
     {MODKEY, XKB_KEY_r, spawn, {.v = menucmd}},
     {MODKEY, XKB_KEY_Return, spawn, {.v = termcmd}},
+    {0, XKB_KEY_XF86AudioRaiseVolume, spawn, {.v = raisevol}},
+    {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
+    {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
+    {0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = lowerbright}},
     {MODKEY, XKB_KEY_t, focusortogglematchingscratch, {.v = termscratch}},
     {MODKEY, XKB_KEY_n, focusortogglematchingscratch, {.v = notescratch}},
     {MODKEY, XKB_KEY_s, focusortogglematchingscratch, {.v = signalscratch}},
