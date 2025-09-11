@@ -22,7 +22,7 @@ jobs:
         run: nix --version
 
       - name: Flake checks
-        run: nix flake check --print-build-logs --show-trace --all-systems
+        run: NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 nix flake check --print-build-logs --show-trace --all-systems --impure
 
       - name: Build scan-build report
         run: nix build --print-build-logs .#checks.x86_64-linux.scan-build
