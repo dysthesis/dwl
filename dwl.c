@@ -697,6 +697,8 @@ void applyrules(Client *c) {
 void arrange(Monitor *m) {
   Client *c;
 
+  if (!m)
+    return;
   if (!m->wlr_output->enabled)
     return;
 
@@ -1024,7 +1026,10 @@ void checkidleinhibitor(struct wlr_surface *exclude) {
   wl_list_for_each(inhibitor, &idle_inhibit_mgr->inhibitors, link) {
     struct wlr_surface *surface =
         wlr_surface_get_root_surface(inhibitor->surface);
-    struct wlr_scene_tree *tree = surface->data;
+    struct wlr_scene_tree *tree;
+    if (!surface)
+      continue;
+    tree = surface->data;
     if (exclude != surface &&
         (bypass_surface_visibility ||
          (!tree ||
@@ -2013,6 +2018,10 @@ static void focusortogglematchingscratch(const Arg *arg) {
   unsigned int found = 0;
   unsigned int hide = 0;
 
+  /* Avoid dereferencing selmon when no monitor is selected */
+  if (!selmon)
+    return;
+
   wl_list_for_each(c, &clients, link) {
     if (c->scratchkey == 0) {
       continue;
@@ -2037,7 +2046,7 @@ static void focusortogglematchingscratch(const Arg *arg) {
         }
       } else {
         // show
-        c->tags = selmon->tagset[selmon->seltags];
+        c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
         // focus
         focusclient(c, 1);
       }
@@ -2061,6 +2070,10 @@ static void focusortogglescratch(const Arg *arg) {
   Client *c;
   unsigned int found = 0;
 
+  /* Avoid dereferencing selmon when no monitor is selected */
+  if (!selmon)
+    return;
+
   /* search for first window that matches the scratchkey */
   wl_list_for_each(c, &clients,
                    link) if (c->scratchkey == ((char **)arg->v)[0][0]) {
@@ -2080,7 +2093,7 @@ static void focusortogglescratch(const Arg *arg) {
       }
     } else {
       // show
-      c->tags = selmon->tagset[selmon->seltags];
+      c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
       focusclient(c, 1);
     }
     arrange(selmon);

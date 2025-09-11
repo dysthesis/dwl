@@ -24,6 +24,143 @@ _: {
         xcbutilwm
       ];
 
+      # cppcheck static analysis
+      mkCppcheck =
+        {
+          enableXWayland ? false,
+        }:
+        pkgs.stdenv.mkDerivation {
+          pname = "dwl-cppcheck";
+          version = "1";
+          src = pkgs.lib.cleanSource ../.;
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            wayland-scanner
+            gnumake
+            cppcheck
+            coreutils
+            findutils
+          ];
+          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          dontConfigure = true;
+          buildPhase = ''
+            set -euo pipefail
+            echo "Generating Wayland protocol headers for analysis..."
+            make \
+              WAYLAND_SCANNER=${pkgs.wayland-scanner.bin}/bin/wayland-scanner \
+              cursor-shape-v1-protocol.h \
+              pointer-constraints-unstable-v1-protocol.h \
+              wlr-layer-shell-unstable-v1-protocol.h \
+              wlr-output-power-management-unstable-v1-protocol.h \
+              xdg-shell-protocol.h
+
+            echo "Collecting include/define flags..."
+            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"}"
+            # Prefer wlroots-0.19 but fall back to wlroots if needed
+            if ${pkgs.pkg-config}/bin/pkg-config --exists wlroots-0.19; then
+              WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots-0.19)
+            else
+              WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots)
+            fi
+            CFLAGS_RAW=$(${pkgs.pkg-config}/bin/pkg-config --cflags $PKGS)
+            # Filter only -I and -D flags for cppcheck
+            FILTERED=""
+            for t in $CFLAGS_RAW $WLR_INCS; do
+              case "$t" in
+                -I*|-D*) FILTERED="$FILTERED $t" ;;
+              esac
+            done
+
+            echo "Running cppcheck..."
+            # Analyze all C files in the tree root (dwl.c, util.c)
+            sources=$(ls *.c)
+            ${pkgs.cppcheck}/bin/cppcheck \
+              --std=c11 \
+              --language=c \
+              --force \
+              --inline-suppr \
+              --enable=warning,performance,portability \
+              --check-level=exhaustive \
+              --error-exitcode=1 \
+              -I . $FILTERED \
+              $sources
+          '';
+          installPhase = ''
+            mkdir -p "$out"
+            touch "$out/ok"
+          '';
+        };
+
+      # clang-tidy static analysis (clang-analyzer checks)
+      mkClangTidy =
+        {
+          enableXWayland ? false,
+        }:
+        pkgs.stdenv.mkDerivation {
+          pname = "dwl-clang-tidy";
+          version = "1";
+          src = pkgs.lib.cleanSource ../.;
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            wayland-scanner
+            gnumake
+            clang
+            clang-tools
+            coreutils
+            findutils
+          ];
+          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          dontConfigure = true;
+          buildPhase = ''
+            set -euo pipefail
+            echo "Generating Wayland protocol headers for analysis..."
+            make \
+              WAYLAND_SCANNER=${pkgs.wayland-scanner.bin}/bin/wayland-scanner \
+              cursor-shape-v1-protocol.h \
+              pointer-constraints-unstable-v1-protocol.h \
+              wlr-layer-shell-unstable-v1-protocol.h \
+              wlr-output-power-management-unstable-v1-protocol.h \
+              xdg-shell-protocol.h
+
+            echo "Collecting include/define flags..."
+            PKGS="wayland-server xkbcommon libinput pixman-1 fcft${pkgs.lib.optionalString enableXWayland " xcb xcb-icccm"}"
+            if ${pkgs.pkg-config}/bin/pkg-config --exists wlroots-0.19; then
+              WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots-0.19)
+            else
+              WLR_INCS=$(${pkgs.pkg-config}/bin/pkg-config --cflags wlroots)
+            fi
+            CFLAGS_RAW=$(${pkgs.pkg-config}/bin/pkg-config --cflags $PKGS)
+            FILTERED=""
+            for t in $CFLAGS_RAW $WLR_INCS; do
+              case "$t" in
+                -I*|-D*) FILTERED="$FILTERED $t" ;;
+              esac
+            done
+
+            echo "Running clang-tidy (clang-analyzer checks only)..."
+            sources=$(ls *.c)
+            fail=0
+            for f in $sources; do
+              echo "  -> $f"
+              ${pkgs.clang-tools}/bin/clang-tidy \
+                -quiet \
+                -checks=clang-analyzer-* \
+                "$f" -- \
+                -std=c11 \
+                -DWLR_USE_UNSTABLE \
+                -D_POSIX_C_SOURCE=200809L \
+                -DVERSION=\"0.0\" \
+                -I . $FILTERED \
+              || fail=1
+            done
+            test $fail -eq 0
+          '';
+          installPhase = ''
+            mkdir -p "$out"
+            touch "$out/ok"
+          '';
+        };
+
       mkScanBuild =
         {
           enableXWayland ? false,
@@ -69,9 +206,23 @@ _: {
         stdenv = pkgs.clangStdenv;
       };
 
+      # Strict Clang build (XWayland)
+      clangWerrorX = pkgs.callPackage ./pkgs/dwl.nix {
+        stdenv = pkgs.clangStdenv;
+        enableXWayland = true;
+        inherit (pkgs) xorg;
+      };
+
       # Strict GCC build with -fanalyzer
       gccFanalyzer = pkgs.callPackage ./pkgs/dwl.nix {
         stdenv = pkgs.gccStdenv;
+      };
+
+      # Strict GCC build with -fanalyzer (XWayland)
+      gccFanalyzerX = pkgs.callPackage ./pkgs/dwl.nix {
+        stdenv = pkgs.gccStdenv;
+        enableXWayland = true;
+        inherit (pkgs) xorg;
       };
     in
     {
@@ -87,13 +238,30 @@ _: {
 
         # Clang analyzer via scan-build as a dedicated check (HTML report in result/scan-report)
         scan-build = mkScanBuild { enableXWayland = false; };
+        scan-build-xwayland = mkScanBuild { enableXWayland = true; };
+
+        # cppcheck static analysis (C11)
+        cppcheck = mkCppcheck { enableXWayland = false; };
+        cppcheck-xwayland = mkCppcheck { enableXWayland = true; };
+
+        # clang-tidy static analysis (clang-analyzer checks)
+        clang-tidy = mkClangTidy { enableXWayland = false; };
+        clang-tidy-xwayland = mkClangTidy { enableXWayland = true; };
 
         clang-werror = clangWerror.overrideAttrs (prev: {
           NIX_CFLAGS_COMPILE =
             (prev.NIX_CFLAGS_COMPILE or "") + " -Werror -Wformat -Wformat-security -Wundef";
         });
+        clang-werror-xwayland = clangWerrorX.overrideAttrs (prev: {
+          NIX_CFLAGS_COMPILE =
+            (prev.NIX_CFLAGS_COMPILE or "") + " -Werror -Wformat -Wformat-security -Wundef";
+        });
 
         gcc-fanalyzer = gccFanalyzer.overrideAttrs (prev: {
+          NIX_CFLAGS_COMPILE =
+            (prev.NIX_CFLAGS_COMPILE or "") + " -fanalyzer -Werror -Wformat -Wformat-security";
+        });
+        gcc-fanalyzer-xwayland = gccFanalyzerX.overrideAttrs (prev: {
           NIX_CFLAGS_COMPILE =
             (prev.NIX_CFLAGS_COMPILE or "") + " -fanalyzer -Werror -Wformat -Wformat-security";
         });
