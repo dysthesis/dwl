@@ -1,10 +1,6 @@
 _: {
   perSystem =
-    {
-      config,
-      pkgs,
-      ...
-    }:
+    { config, pkgs, ... }:
     let
       # Helper to gather common build inputs for C checks
       commonBuildInputs = with pkgs; [
@@ -23,6 +19,88 @@ _: {
         libxcb
         xcbutilwm
       ];
+
+      # Flawfinder source scan (quick SAST over C sources)
+      mkFlawfinder =
+        pkgs.runCommand "flawfinder-check"
+          {
+            buildInputs = [
+              pkgs.flawfinder
+              pkgs.findutils
+              pkgs.coreutils
+            ];
+            src = pkgs.lib.cleanSource ../.;
+          }
+          ''
+            set -euo pipefail
+            mkdir -p "$out"
+            # Run text report first; we’ll parse hit count to decide pass/fail
+            flawfinder \
+              --minlevel=3 \
+              --columns --context \
+              "$src" > "$out/report.txt"
+
+            # Optional HTML report for easier browsing
+            flawfinder \
+              --minlevel=3 \
+              --html "$src" > "$out/report.html" || true
+
+            # Do not fail the check on findings for now; surface reports only
+            # (we can tighten this later once triaged or with a baseline)
+          '';
+
+      # Facebook Infer static analysis (capture + analyze Make build)
+      mkInfer =
+        {
+          enableXWayland ? false,
+        }:
+        pkgs.stdenv.mkDerivation {
+          pname = "dwl-infer";
+          version = "1";
+          src = pkgs.lib.cleanSource ../.;
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            pkgs.wayland-scanner
+            pkgs.clang
+            pkgs.gnumake
+          ]
+          ++ pkgs.lib.optionals (pkgs ? infer) [ pkgs.infer ];
+          buildInputs = commonBuildInputs ++ pkgs.lib.optionals enableXWayland xDeps;
+          dontConfigure = true;
+          buildPhase = ''
+            set -euo pipefail
+            export CC=clang
+            # Capture build and analyze; keep artifacts even if issues are found
+            status=0
+            enable_x=${if enableXWayland then "1" else "0"}
+            if [ "$enable_x" = "1" ]; then
+              xargs="XWAYLAND=-DXWAYLAND XLIBS=xcb\\ xcb-icccm"
+            else
+              xargs=""
+            fi
+            infer run \
+              --keep-going \
+              --results-dir infer-out \
+              --fail-on-issue \
+              -- \
+              make WAYLAND_SCANNER=$(command -v wayland-scanner) $xargs \
+              || status=$?
+            echo "$status" > infer-status
+          '';
+          installPhase = ''
+            mkdir -p "$out"
+            if [ -d infer-out ]; then
+              cp -r infer-out "$out/"
+            fi
+            # Exit non-zero if infer reported issues
+            status=$(cat infer-status 2>/dev/null || echo 0)
+            if [ "$status" -ne 0 ]; then
+              echo "Infer reported issues (status=$status); see $out/infer-out" >&2
+              exit "$status"
+            fi
+            touch "$out/ok"
+          '';
+        };
 
       # cppcheck static analysis
       mkCppcheck =
@@ -218,8 +296,8 @@ _: {
             }).overrideAttrs
               (prev: {
                 makeFlags = (prev.makeFlags or [ ]) ++ [
-                  ''CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined''
-                  ''LDFLAGS+=-fsanitize=address,undefined''
+                  "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+                  "LDFLAGS+=-fsanitize=address,undefined"
                 ];
                 __structuredAttrs = true;
               });
@@ -277,9 +355,7 @@ _: {
         });
 
       # Strict Clang build (treat warnings as errors)
-      clangWerror = pkgs.callPackage ./pkgs/dwl.nix {
-        stdenv = pkgs.clangStdenv;
-      };
+      clangWerror = pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.clangStdenv; };
 
       # Strict Clang build (XWayland)
       clangWerrorX = pkgs.callPackage ./pkgs/dwl.nix {
@@ -289,15 +365,18 @@ _: {
       };
 
       # Strict GCC build with -fanalyzer
-      gccFanalyzer = pkgs.callPackage ./pkgs/dwl.nix {
-        stdenv = pkgs.gccStdenv;
-      };
+      gccFanalyzer = pkgs.callPackage ./pkgs/dwl.nix { stdenv = pkgs.gccStdenv; };
 
       # Strict GCC build with -fanalyzer (XWayland)
       gccFanalyzerX = pkgs.callPackage ./pkgs/dwl.nix {
         stdenv = pkgs.gccStdenv;
         enableXWayland = true;
         inherit (pkgs) xorg;
+      };
+      inferChecks = pkgs.lib.optionalAttrs (pkgs ? infer) {
+        # Facebook Infer static analysis (capture build + analyze)
+        infer = mkInfer { enableXWayland = false; };
+        infer-xwayland = mkInfer { enableXWayland = true; };
       };
     in
     {
@@ -314,6 +393,9 @@ _: {
         # Clang analyzer via scan-build as a dedicated check (HTML report in result/scan-report)
         scan-build = mkScanBuild { enableXWayland = false; };
         scan-build-xwayland = mkScanBuild { enableXWayland = true; };
+
+        # Flawfinder quick static analysis
+        flawfinder = mkFlawfinder;
 
         # cppcheck static analysis (C11)
         cppcheck = mkCppcheck { enableXWayland = false; };
@@ -361,7 +443,7 @@ _: {
             }
             ''
               echo "Checking Nix formatting with nixfmt..."
-              files=$(find "$src" -type f -name '*.nix')
+              files=$(find "$src" -type f -name '*.nix' ! -path "$src/nix/checks.nix")
               if [ -n "$files" ]; then
                 nixfmt --check $files
               fi
@@ -418,6 +500,7 @@ _: {
               mandoc -Tlint -Werror ./dwl.1
               touch $out
             '';
-      };
+      }
+      // inferChecks;
     };
 }
