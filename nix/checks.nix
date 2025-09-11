@@ -201,6 +201,81 @@ _: {
           '';
         };
 
+      # Build a clang-based dwl with ASan+UBSan (+frame-pointers) and run a simple
+      # headless smoke test to exercise basic compositor/client paths.
+      mkAsanUbsanRun =
+        {
+          enableXWayland ? false,
+        }:
+        let
+          sanPkg =
+            (pkgs.callPackage ./pkgs/dwl.nix {
+              stdenv = pkgs.clangStdenv;
+              inherit enableXWayland;
+              inherit (pkgs) xorg;
+              # Disable repo autostart to avoid unknown commands in CI
+              autostart = [ ];
+            }).overrideAttrs
+              (prev: {
+                makeFlags = (prev.makeFlags or [ ]) ++ [
+                  ''CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined''
+                  ''LDFLAGS+=-fsanitize=address,undefined''
+                ];
+                __structuredAttrs = true;
+              });
+        in
+        pkgs.runCommand "dwl-asan-ubsan-smoketest"
+          {
+            buildInputs = [
+              sanPkg
+              pkgs.coreutils
+              pkgs.bash
+              pkgs.toybox
+              pkgs.foot
+              pkgs.wmenu
+            ];
+          }
+          ''
+            set -euo pipefail
+            export ASAN_OPTIONS=detect_leaks=0:strict_init_order=1:abort_on_error=1
+            export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1
+            export XDG_RUNTIME_DIR="$PWD/xdg"
+            mkdir -p "$XDG_RUNTIME_DIR"
+            chmod 700 "$XDG_RUNTIME_DIR"
+            export WLR_BACKENDS=headless
+            export WLR_RENDERER_ALLOW_SOFTWARE=1
+            # Exercise client create/map/unmap and compositor run loop.
+            # - Start dwl with a startup script that launches a couple of clients
+            #   and then exits successfully, while we still guard with timeout.
+            ${pkgs.coreutils}/bin/timeout 8s ${sanPkg}/bin/dwl -s \
+              "${pkgs.bash}/bin/bash -ceu ' \
+                 (${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &) ; \
+                 (printf %s\\n x | ${pkgs.wmenu}/bin/wmenu -p test >/dev/null 2>&1 &) ; \
+                 sleep 1 ; exit 0 '" || true
+            touch "$out"
+          '';
+
+      # Strict warnings-as-errors build using a curated warning set
+      mkWarningsStrict =
+        {
+          enableXWayland ? false,
+        }:
+        let
+          base = pkgs.callPackage ./pkgs/dwl.nix {
+            stdenv = pkgs.clangStdenv;
+            inherit enableXWayland;
+            inherit (pkgs) xorg;
+          };
+        in
+        base.overrideAttrs (prev: {
+          NIX_CFLAGS_COMPILE =
+            (prev.NIX_CFLAGS_COMPILE or "")
+            + " -Wall -Wextra -Werror -Wformat=2 -Wvla -Wshadow -Wcast-align"
+            + " -Wpointer-arith -Wstrict-prototypes -Wconversion -Wsign-conversion"
+            + " -Wno-unused-parameter -Wno-implicit-int-conversion -Wno-implicit-int-float-conversion"
+            + " -Wno-sign-conversion -Wno-cast-align -Wno-vla -Wno-format-nonliteral";
+        });
+
       # Strict Clang build (treat warnings as errors)
       clangWerror = pkgs.callPackage ./pkgs/dwl.nix {
         stdenv = pkgs.clangStdenv;
@@ -247,6 +322,14 @@ _: {
         # clang-tidy static analysis (clang-analyzer checks)
         clang-tidy = mkClangTidy { enableXWayland = false; };
         clang-tidy-xwayland = mkClangTidy { enableXWayland = true; };
+
+        # Sanitized run smoke tests
+        asan-ubsan-run = mkAsanUbsanRun { enableXWayland = false; };
+        asan-ubsan-run-xwayland = mkAsanUbsanRun { enableXWayland = true; };
+
+        # Strict warnings-as-errors builds
+        warnings-strict = mkWarningsStrict { enableXWayland = false; };
+        warnings-strict-xwayland = mkWarningsStrict { enableXWayland = true; };
 
         clang-werror = clangWerror.overrideAttrs (prev: {
           NIX_CFLAGS_COMPILE =
