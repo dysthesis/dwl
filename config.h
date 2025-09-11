@@ -10,7 +10,7 @@ static const int bypass_surface_visibility =
 static const int smartborders = 1;
 static const unsigned int borderpx = 1; /* border pixel of windows */
 static const int showbar = 1; /* 0 means no bar */
-static const int topbar = 1;  /* 0 means bottom bar */
+static const int topbar = 0;  /* 0 means bottom bar */
 static const char *fonts[] = {"JBMono Nerd Font:size=9"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
@@ -23,11 +23,11 @@ static const char cursor_size[] =
  * behavior */
 static const float fullscreen_bg[] = {0.0f, 0.0f, 0.0f,
                                       1.0f}; /* You can also use glsl colors */
-static uint32_t colors[][3] = {
-    /*               fg          bg          border    */
-    [SchemeNorm] = {0xbbbbbbff, 0x222222ff, 0x444444ff},
-    [SchemeSel] = {0xeeeeeeff, 0x005577ff, 0x005577ff},
-    [SchemeUrg] = {0, 0, 0x770000ff},
+static uint32_t colors[][3]                = {
+     /*               fg          bg          border    */
+     [SchemeNorm] = { 0xffffffff, 0x040404ff, 0x191919ff },
+     [SchemeSel]  = { 0xffffffff, 0x191919ff, 0xffffffff },
+     [SchemeUrg]  = { 0,          0,          0xffaa88ff },
 };
 static int enableautoswallow =
     1; /* enables autoswallowing newly spawned clients */
