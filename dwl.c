@@ -2075,9 +2075,16 @@ static void focusortogglematchingscratch(const Arg *arg) {
           focusclient(c, 1);
         }
       } else {
-        // show
-        c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
-        // focus
+        /* show on the currently focused monitor
+         * If the scratch client belongs to a different monitor, move it to
+         * selmon and assign its tags to the currently selected tagset so it
+         * becomes visible there. Otherwise, just retag it locally. */
+        if (c->mon != selmon) {
+          setmon(c, selmon, selmon ? selmon->tagset[selmon->seltags] : 0);
+        } else {
+          c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
+        }
+        /* focus */
         focusclient(c, 1);
       }
       found = 1;
