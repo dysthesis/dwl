@@ -3010,9 +3010,13 @@ void setfloating(Client *c, int floating) {
 }
 
 void setfullscreen(Client *c, int fullscreen) {
+  int was_fullscreen = c->isfullscreen;
   c->isfullscreen = fullscreen;
   if (!c->mon || !client_surface(c)->mapped)
     return;
+
+  /* Update border and protocol state regardless, but avoid geometry override
+   * unless the fullscreen state actually changes. */
   c->bw = fullscreen ? 0 : BORDERPX(c);
   client_set_fullscreen(c, fullscreen);
   wlr_scene_node_reparent(&c->scene->node, layers[c->isfullscreen ? LyrFS
@@ -3020,13 +3024,15 @@ void setfullscreen(Client *c, int fullscreen) {
                                                                   : LyrTile]);
 
   if (fullscreen) {
-    c->prev = c->geom;
+    /* Ensure client covers the monitor when (or while) fullscreen */
+    if (!was_fullscreen)
+      c->prev = c->geom;
     resize(c, c->mon->m, 0, 0);
-  } else {
-    /* restore previous size instead of arrange for floating windows since
-     * client positions are set by the user and cannot be recalculated */
+  } else if (was_fullscreen) {
+    /* Only restore previous geometry when exiting fullscreen */
     resize(c, c->prev, 0, 1);
   }
+
   arrange(c->mon);
   drawbars();
 }
@@ -3077,8 +3083,20 @@ void setmon(Client *c, Monitor *m, uint32_t newtags) {
   if (oldmon)
     arrange(oldmon);
   if (m) {
+    /*
+     * When moving a floating client between monitors (e.g. via singletagset
+     * workspace swap), keep it centered on the destination monitor instead of
+     * clamping to the nearest edge due to out-of-bounds geometry.
+     * For tiled clients, keep geometry and let arrange() handle placement.
+     */
+    struct wlr_box geo = c->geom;
+    if (c->isfloating) {
+      struct wlr_box b = respect_monitor_reserved_area ? m->w : m->m;
+      geo.x = b.x + (b.width - geo.width) / 2;
+      geo.y = b.y + (b.height - geo.height) / 2;
+    }
     /* Make sure window actually overlaps with the monitor */
-    resize(c, c->geom, 0, 1);
+    resize(c, geo, 0, 1);
     c->tags = newtags
                   ? newtags
                   : m->tagset[m->seltags]; /* assign tags of target monitor */
