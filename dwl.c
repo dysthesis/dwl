@@ -2129,8 +2129,12 @@ static void focusortogglescratch(const Arg *arg) {
         focusclient(c, 1);
       }
     } else {
-      // show
-      c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
+      /* show on the currently focused monitor */
+      if (c->mon != selmon) {
+        setmon(c, selmon, selmon ? selmon->tagset[selmon->seltags] : 0);
+      } else {
+        c->tags = selmon ? selmon->tagset[selmon->seltags] : 0;
+      }
       focusclient(c, 1);
     }
     arrange(selmon);
