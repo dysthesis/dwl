@@ -1,13 +1,13 @@
 /*
  * See LICENSE file for copyright and license details.
  */
+#include <errno.h>
 #include <getopt.h>
+#include <libdrm/drm_fourcc.h>
 #include <libinput.h>
 #include <linux/input-event-codes.h>
 #include <math.h>
-#include <libdrm/drm_fourcc.h>
 #include <signal.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
@@ -16,6 +16,7 @@
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <wlr/backend/libinput.h>
+#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_alpha_modifier_v1.h>
@@ -61,7 +62,6 @@
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include <xkbcommon/xkbcommon.h>
@@ -71,8 +71,8 @@
 #include <xcb/xcb_icccm.h>
 #endif
 
-#include "util.h"
 #include "drwl.h"
+#include "util.h"
 
 /* macros */
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
@@ -101,7 +101,7 @@
    ((C)->swallowing ? (int)ceilf(swallowborder * (C)->swallowing->bw) : 0))
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeUrg }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeUrg };          /* color schemes */
 enum { CurNormal, CurPressed, CurMove, CurResize }; /* cursor */
 enum { XDGShell, LayerShell, X11 };                 /* client types */
 enum {
@@ -115,7 +115,14 @@ enum {
   LyrBlock,
   NUM_LAYERS
 }; /* scene layers */
-enum { ClkTagBar, ClkLtSymbol, ClkStatus, ClkTitle, ClkClient, ClkRoot }; /* clicks */
+enum {
+  ClkTagBar,
+  ClkLtSymbol,
+  ClkStatus,
+  ClkTitle,
+  ClkClient,
+  ClkRoot
+}; /* clicks */
 
 typedef union {
   int i;
@@ -235,18 +242,18 @@ struct Monitor {
   struct wlr_output *wlr_output;
   struct wlr_scene_output *scene_output;
   struct wlr_scene_buffer *scene_buffer; /* bar buffer */
-  struct wlr_scene_rect *fullscreen_bg; /* See createmon() for info */
+  struct wlr_scene_rect *fullscreen_bg;  /* See createmon() for info */
   struct wl_listener frame;
   struct wl_listener destroy;
   struct wl_listener request_state;
   struct wl_listener destroy_lock_surface;
   struct wlr_session_lock_surface_v1 *lock_surface;
-  struct wlr_box m;         /* monitor area, layout-relative */
+  struct wlr_box m; /* monitor area, layout-relative */
   struct {
     int width, height;
     int real_width, real_height; /* non-scaled */
     float scale;
-  } b; /* bar area */
+  } b;                      /* bar area */
   struct wlr_box w;         /* window area, layout-relative */
   struct wl_list layers[4]; /* LayerSurface.link */
   const Layout *lt[2];
@@ -319,10 +326,11 @@ static void arrangelayers(Monitor *m);
 static void autostartexec(void);
 static void attachclients(Monitor *m);
 static void axisnotify(struct wl_listener *listener, void *data);
-static bool baracceptsinput(struct wlr_scene_buffer *buffer, double *sx, double *sy);
+static bool baracceptsinput(struct wlr_scene_buffer *buffer, double *sx,
+                            double *sy);
 static void bufdestroy(struct wlr_buffer *buffer);
-static bool bufdatabegin(struct wlr_buffer *buffer, uint32_t flags,
-		void **data, uint32_t *format, size_t *stride);
+static bool bufdatabegin(struct wlr_buffer *buffer, uint32_t flags, void **data,
+                         uint32_t *format, size_t *stride);
 static void bufdataend(struct wlr_buffer *buffer);
 static Buffer *bufmon(Monitor *m);
 static void bufrelease(struct wl_listener *listener, void *data);
@@ -850,7 +858,8 @@ void autostartexec(void) {
   for (p = autostart; *p; i++, p++) {
     if ((autostart_pids[i] = fork()) == 0) {
       setsid();
-      /* flawfinder: ignore (intentional program exec; argv is from trusted config.h) */
+      /* flawfinder: ignore (intentional program exec; argv is from trusted
+       * config.h) */
       execvp(*p, (char *const *)p);
       die("dwl: execvp %s:", *p);
     }
@@ -985,7 +994,8 @@ void buttonpress(struct wl_listener *listener, void *data) {
         arg.ui = 1u << i;
       } else if (cx < x + TEXTW(selmon, selmon->ltsymbol))
         click = ClkLtSymbol;
-      else if (cx > selmon->b.width - (TEXTW(selmon, stext) - selmon->lrpad + 2))
+      else if (cx >
+               selmon->b.width - (TEXTW(selmon, stext) - selmon->lrpad + 2))
         click = ClkStatus;
       else
         click = ClkTitle;
@@ -993,7 +1003,8 @@ void buttonpress(struct wl_listener *listener, void *data) {
 
     /* Change focus if the button was _pressed_ over a client */
     xytonode(cursor->x, cursor->y, NULL, &c, NULL, NULL, NULL);
-    if (click == ClkClient && (!client_is_unmanaged(c) || client_wants_focus(c)))
+    if (click == ClkClient &&
+        (!client_is_unmanaged(c) || client_wants_focus(c)))
       focusclient(c, 1);
 
     keyboard = wlr_seat_get_keyboard(seat);
@@ -1818,8 +1829,11 @@ void drawbar(Monitor *m) {
     if (!(occ & 1u << i || m->tagset[m->seltags] & 1u << i))
       continue;
     w = TEXTW(m, tags[i]);
-    drwl_setscheme(m->drw, colors[m->tagset[m->seltags] & 1u << i ? SchemeSel : SchemeNorm]);
-    drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, tags[i], urg & 1u << i);
+    drwl_setscheme(
+        m->drw,
+        colors[m->tagset[m->seltags] & 1u << i ? SchemeSel : SchemeNorm]);
+    drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, tags[i],
+              urg & 1u << i);
     x += w;
   }
   w = TEXTW(m, m->ltsymbol);
@@ -1835,7 +1849,8 @@ void drawbar(Monitor *m) {
                 client_get_title(c), 0);
       if (c && c->isfloating)
         drwl_rect(m->drw,
-                  !centeredtitle || tw > w ? x + boxs : x + ((w - tw) / 2 - boxs * 8),
+                  !centeredtitle || tw > w ? x + boxs
+                                           : x + ((w - tw) / 2 - boxs * 8),
                   boxs, boxw, boxw, 0, 0);
     } else {
       drwl_setscheme(m->drw, colors[SchemeNorm]);
@@ -1845,9 +1860,9 @@ void drawbar(Monitor *m) {
 
   wlr_scene_buffer_set_dest_size(m->scene_buffer, m->b.real_width,
                                  m->b.real_height);
-  wlr_scene_node_set_position(&m->scene_buffer->node, m->m.x + sidepad,
-                              m->m.y + (topbar ? vertpad
-                                               : m->m.height - m->b.real_height - vertpad));
+  wlr_scene_node_set_position(
+      &m->scene_buffer->node, m->m.x + sidepad,
+      m->m.y + (topbar ? vertpad : m->m.height - m->b.real_height - vertpad));
   wlr_scene_buffer_set_buffer(m->scene_buffer, &buf->base);
   wlr_buffer_unlock(&buf->base);
 }
@@ -2010,7 +2025,8 @@ void focusclient(Client *c, int lift) {
        * issues with winecfg and probably other clients */
     } else if (old_c && !client_is_unmanaged(old_c) &&
                (!c || !client_wants_focus(c))) {
-      client_set_border_color(old_c, (float[])COLOR(colors[SchemeNorm][ColBorder]));
+      client_set_border_color(old_c,
+                              (float[])COLOR(colors[SchemeNorm][ColBorder]));
 
       client_activate_surface(old, 0);
     }
@@ -2438,7 +2454,8 @@ void mapnotify(struct wl_listener *listener, void *data) {
   for (i = 0; i < 4; i++) {
     c->border[i] = wlr_scene_rect_create(
         c->scene, 0, 0,
-        (float[])COLOR(colors[c->isurgent ? SchemeUrg : SchemeNorm][ColBorder]));
+        (float[])COLOR(
+            colors[c->isurgent ? SchemeUrg : SchemeNorm][ColBorder]));
     c->border[i]->node.data = c;
   }
 
@@ -2938,7 +2955,8 @@ void run(char *startup_cmd) {
       setsid();
       close(piperw[0]);
       close(piperw[1]);
-      /* flawfinder: ignore (intentional shell invocation; startup_cmd comes from CLI flag or wlroots environment) */
+      /* flawfinder: ignore (intentional shell invocation; startup_cmd comes
+       * from CLI flag or wlroots environment) */
       execl("/bin/sh", "/bin/sh", "-c", startup_cmd, NULL);
       die("startup: execl:");
     }
@@ -3363,9 +3381,9 @@ void setup(void) {
   wl_signal_add(&output_mgr->events.test, &output_mgr_test);
 
   drwl_init();
-  status_event_source = wl_event_loop_add_fd(wl_display_get_event_loop(dpy),
-                                             STDIN_FILENO, WL_EVENT_READABLE,
-                                             statusin, NULL);
+  status_event_source =
+      wl_event_loop_add_fd(wl_display_get_event_loop(dpy), STDIN_FILENO,
+                           WL_EVENT_READABLE, statusin, NULL);
 
   /* Make sure XWayland clients don't connect to the parent X server,
    * e.g when running in the x11 backend or the wayland backend and the
@@ -3393,7 +3411,8 @@ void spawn(const Arg *arg) {
     close(STDIN_FILENO);
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
-    /* flawfinder: ignore (intentional program exec; argv is from trusted keybindings) */
+    /* flawfinder: ignore (intentional program exec; argv is from trusted
+     * keybindings) */
     execvp(((char **)arg->v)[0], (char **)arg->v);
     die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
   }
@@ -3403,7 +3422,8 @@ void spawnscratch(const Arg *arg) {
   if (fork() == 0) {
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
-    /* flawfinder: ignore (intentional program exec; argv is from trusted keybindings) */
+    /* flawfinder: ignore (intentional program exec; argv is from trusted
+     * keybindings) */
     execvp(((char **)arg->v)[1], ((char **)arg->v) + 1);
     die("dwl: execvp %s failed:", ((char **)arg->v)[1]);
   }
@@ -3419,7 +3439,7 @@ void startdrag(struct wl_listener *listener, void *data) {
 }
 
 int statusin(int fd, unsigned int mask, void *data) {
-  char status[256];
+  char status[512];
   ssize_t n;
   (void)data;
 
@@ -4178,7 +4198,8 @@ int main(int argc, char *argv[]) {
   char *startup_cmd = NULL;
   int c;
 
-  /* flawfinder: ignore (getopt is standard and bounded by argv; our use is safe) */
+  /* flawfinder: ignore (getopt is standard and bounded by argv; our use is
+   * safe) */
   while ((c = getopt(argc, argv, "s:hdv")) != -1) {
     if (c == 's')
       startup_cmd = optarg;
