@@ -60,43 +60,47 @@ let
       };'';
 
   escapeComment = c: lib.replaceStrings [ "*/" ] [ "* /" ] c;
-  renderModifiers = kb:
+  renderModifiers =
+    kb:
     if kb ? modifiers then
       (if kb.modifiers == [ ] then "0" else lib.concatStringsSep " | " kb.modifiers)
-    else if kb ? mod then
-      kb.mod
     else
-      "0";
-  renderFunc = kb:
-    if kb ? function then kb.function else if kb ? func then kb.func else throw "dwl: extra keybind missing function";
-  renderArg = arg:
+      kb.mod or "0";
+  renderFunc = kb: kb.function or (kb.func or (throw "dwl: extra keybind missing function"));
+  renderArg =
+    arg:
     if lib.isString arg then
       arg
     else if lib.isAttrs arg then
-      if arg ? raw then
-        arg.raw
-      else if arg ? union && arg ? value then
-        "{." + arg.union + " = " + arg.value + " }"
-      else
-        throw "dwl: extra keybind argument must provide either raw or union/value"
+
+      arg.raw or (
+        if arg ? union && arg ? value then
+          "{." + arg.union + " = " + arg.value + " }"
+        else
+          throw "dwl: extra keybind argument must provide either raw or union/value"
+      )
     else
       throw "dwl: extra keybind argument must be a string or attribute set";
-  renderKeybind = kb:
+  renderKeybind =
+    kb:
     let
-      key = if kb ? key then kb.key else throw "dwl: extra keybind missing key";
+      key = kb.key or (throw "dwl: extra keybind missing key");
       func = renderFunc kb;
       mod = renderModifiers kb;
-      arg = renderArg (if kb ? argument then kb.argument else if kb ? arg then kb.arg else "{0}");
+      arg = renderArg (kb.argument or (kb.arg or "{0}"));
       comment = if kb ? comment then " /* " + escapeComment kb.comment + " */" else "";
     in
     "\t{ " + mod + ", " + key + ", " + func + ", " + arg + " }," + comment;
-  renderKeybindBlock = keybinds:
-    if keybinds == [ ] then "" else
-    let
-      lines = map renderKeybind keybinds;
-      body = lib.concatStringsSep "\n" lines;
-    in
-    "\n\t/* extra keybinds injected via Nix */\n" + body + "\n";
+  renderKeybindBlock =
+    keybinds:
+    if keybinds == [ ] then
+      ""
+    else
+      let
+        lines = map renderKeybind keybinds;
+        body = lib.concatStringsSep "\n" lines;
+      in
+      "\n\t/* extra keybinds injected via Nix */\n" + body + "\n";
 
   xDeps =
     if enableXWayland then
@@ -176,32 +180,32 @@ stdenv.mkDerivation {
       in
       # sh
       ''
-            echo "Injecting autostart into config.h"
-            # Ensure a config.h exists to patch
-            if [ ! -f config.h ]; then
-              cp config.def.h config.h
-            fi
+              echo "Injecting autostart into config.h"
+              # Ensure a config.h exists to patch
+              if [ ! -f config.h ]; then
+                cp config.def.h config.h
+              fi
 
-            cat > autostart.block << 'EOF'
-      ${block}
-      EOF
+              cat > autostart.block << 'EOF'
+        ${block}
+        EOF
 
-            # Find range for the existing autostart[] block and replace it atomically
-            startline=$(grep -n -E '^static const char \*const autostart\[\] = \{$' config.h | cut -d: -f1)
-            if [ -z "$startline" ]; then
-              echo "error: could not find autostart[] in config.h" >&2
-              exit 1
-            fi
-            endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/ { print NR; exit }' config.h)
-            if [ -z "$endline" ]; then
-              echo "error: could not find end of autostart[] block in config.h" >&2
-              exit 1
-            fi
+              # Find range for the existing autostart[] block and replace it atomically
+              startline=$(grep -n -E '^static const char \*const autostart\[\] = \{$' config.h | cut -d: -f1)
+              if [ -z "$startline" ]; then
+                echo "error: could not find autostart[] in config.h" >&2
+                exit 1
+              fi
+              endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/ { print NR; exit }' config.h)
+              if [ -z "$endline" ]; then
+                echo "error: could not find end of autostart[] block in config.h" >&2
+                exit 1
+              fi
 
-            head -n "$((startline - 1))" config.h > config.h.new
-            cat autostart.block >> config.h.new
-            tail -n "+$((endline + 1))" config.h >> config.h.new
-            mv config.h.new config.h
+              head -n "$((startline - 1))" config.h > config.h.new
+              cat autostart.block >> config.h.new
+              tail -n "+$((endline + 1))" config.h >> config.h.new
+              mv config.h.new config.h
       ''
     ))
     (lib.optionalString (extraKeybinds != [ ]) (
@@ -210,30 +214,30 @@ stdenv.mkDerivation {
       in
       # sh
       ''
-            echo "Injecting extra keybinds into config.h"
-            if [ ! -f config.h ]; then
-              cp config.def.h config.h
-            fi
+              echo "Injecting extra keybinds into config.h"
+              if [ ! -f config.h ]; then
+                cp config.def.h config.h
+              fi
 
-            cat > keybinds.block << 'EOF'
-      ${keyblock}
-      EOF
+              cat > keybinds.block << 'EOF'
+        ${keyblock}
+        EOF
 
-            startline=$(grep -n -E '^static const Key keys\[\] = \{$' config.h | cut -d: -f1)
-            if [ -z "$startline" ]; then
-              echo "error: could not find keys[] in config.h" >&2
-              exit 1
-            fi
-            endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/{ print NR; exit }' config.h)
-            if [ -z "$endline" ]; then
-              echo "error: could not determine end of keys[] block in config.h" >&2
-              exit 1
-            fi
+              startline=$(grep -n -E '^static const Key keys\[\] = \{$' config.h | cut -d: -f1)
+              if [ -z "$startline" ]; then
+                echo "error: could not find keys[] in config.h" >&2
+                exit 1
+              fi
+              endline=$(awk 'NR>'"$startline"' && /^[[:space:]]*};[[:space:]]*$/{ print NR; exit }' config.h)
+              if [ -z "$endline" ]; then
+                echo "error: could not determine end of keys[] block in config.h" >&2
+                exit 1
+              fi
 
-            head -n "$((endline - 1))" config.h > config.h.new
-            cat keybinds.block >> config.h.new
-            tail -n "+$endline" config.h >> config.h.new
-            mv config.h.new config.h
+              head -n "$((endline - 1))" config.h > config.h.new
+              cat keybinds.block >> config.h.new
+              tail -n "+$endline" config.h >> config.h.new
+              mv config.h.new config.h
       ''
     ))
   ];
