@@ -238,10 +238,17 @@ stdenv.mkDerivation {
               cat keybinds.block >> config.h.new
               tail -n "+$endline" config.h >> config.h.new
               mv config.h.new config.h
-              cat config.h
       ''
     ))
   ];
+
+  postInstall = ''
+    if [ -f config.h ]; then
+      install -Dm0644 config.h "$out/share/dwl/config.h"
+    else
+      echo "warning: config.h not found during install" >&2
+    fi
+  '';
 
   # No tests provided
   doCheck = false;
