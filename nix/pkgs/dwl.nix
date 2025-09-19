@@ -34,8 +34,9 @@
   #   - modifiers (list of strings) or mod (string) supply the modifier mask.
   #   - key (string, required) is used verbatim.
   #   - function / func (string, required) names the handler.
-  #   - argument / arg may be a string, a { raw = "..."; } block, or a
-  #     { union = "v"; value = "cmd"; } form to emit {.v = cmd }.
+  #   - argument / arg may be a string, a list of argv strings, a { raw = "..."; }
+  #     block for verbatim C, or a { union = "v"; value = "cmd"; } form to emit
+  #     {.v = cmd }.
   #   - comment (string, optional) appends a /* comment */ suffix to the line.
   extraKeybinds ? [ ],
   # Avoid collision with pkgs.src when using callPackage
@@ -60,6 +61,12 @@ let
       };'';
 
   escapeComment = c: lib.replaceStrings [ "*/" ] [ "* /" ] c;
+  renderArgArray = union: argv:
+    let
+      quoted = map quoteC argv;
+      joined = lib.concatStringsSep ", " quoted;
+    in
+    "{." + union + " = (const char *const[]){ " + joined + ", NULL }}";
   renderModifiers =
     kb:
     if kb ? modifiers then
@@ -68,26 +75,37 @@ let
       kb.mod or "0";
   renderFunc = kb: kb.function or (kb.func or (throw "dwl: extra keybind missing function"));
   renderArg =
-    arg:
-    if lib.isString arg then
+    kb:
+    let
+      arg =
+        if kb ? argument then kb.argument
+        else if kb ? arg then kb.arg
+        else null;
+    in
+    if arg == null then
+      "{0}"
+    else if lib.isString arg then
       arg
+    else if lib.isList arg then
+      renderArgArray "v" arg
     else if lib.isAttrs arg then
-
       arg.raw or (
-        if arg ? union && arg ? value then
+        if arg ? argv then
+          renderArgArray (arg.union or "v") arg.argv
+        else if arg ? union && arg ? value then
           "{." + arg.union + " = " + arg.value + " }"
         else
-          throw "dwl: extra keybind argument must provide either raw or union/value"
+          throw "dwl: extra keybind argument attribute set missing raw, argv, or union/value"
       )
     else
-      throw "dwl: extra keybind argument must be a string or attribute set";
+      throw "dwl: extra keybind argument must be string, list, or attribute set";
   renderKeybind =
     kb:
     let
       key = kb.key or (throw "dwl: extra keybind missing key");
       func = renderFunc kb;
       mod = renderModifiers kb;
-      arg = renderArg (kb.argument or (kb.arg or "{0}"));
+      arg = renderArg kb;
       comment = if kb ? comment then " /* " + escapeComment kb.comment + " */" else "";
     in
     "\t{ " + mod + ", " + key + ", " + func + ", " + arg + " }," + comment;
