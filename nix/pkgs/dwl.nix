@@ -238,6 +238,7 @@ stdenv.mkDerivation {
               cat keybinds.block >> config.h.new
               tail -n "+$endline" config.h >> config.h.new
               mv config.h.new config.h
+              cat config.h
       ''
     ))
   ];
