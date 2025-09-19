@@ -9,12 +9,14 @@ static const int bypass_surface_visibility =
           surface isn't visible  */
 static const int smartborders = 1;
 static const unsigned int borderpx = 1; /* border pixel of windows */
-static const int user_bh = 24; /* 0 means that dwl will calculate barheight, >= 1 means dwl will use user_bh as the bar height. */
-static const int showbar = 1; /* 0 means no bar */
-static const int topbar = 0;  /* 0 means bottom bar */
+static const int user_bh =
+    24; /* 0 means that dwl will calculate barheight, >= 1 means dwl will use
+           user_bh as the bar height. */
+static const int showbar = 1;       /* 0 means no bar */
+static const int topbar = 0;        /* 0 means bottom bar */
 static const int centeredtitle = 1; /* 1 means centered title */
-static const int vertpad = 0; /* vertical padding of bar */
-static const int sidepad = 0; /* horizontal padding of bar */
+static const int vertpad = 0;       /* vertical padding of bar */
+static const int sidepad = 0;       /* horizontal padding of bar */
 static const char *fonts[] = {"JBMono Nerd Font:size=9"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
@@ -27,11 +29,11 @@ static const char cursor_size[] =
  * behavior */
 static const float fullscreen_bg[] = {0.0f, 0.0f, 0.0f,
                                       1.0f}; /* You can also use glsl colors */
-static uint32_t colors[][3]                = {
-     /*               fg          bg          border    */
-     [SchemeNorm] = { 0xffffffff, 0x040404ff, 0x191919ff },
-     [SchemeSel]  = { 0xffffffff, 0x191919ff, 0xffffffff },
-     [SchemeUrg]  = { 0,          0,          0xffaa88ff },
+static uint32_t colors[][3] = {
+    /*               fg          bg          border    */
+    [SchemeNorm] = {0xffffffff, 0x040404ff, 0x191919ff},
+    [SchemeSel] = {0xffffffff, 0x191919ff, 0xffffffff},
+    [SchemeUrg] = {0, 0, 0xffaa88ff},
 };
 static int enableautoswallow =
     1; /* enables autoswallowing newly spawned clients */
@@ -248,8 +250,8 @@ static const Key keys[] = {
     {MODKEY, XKB_KEY_k, focusstack, {.i = -1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_J, movestack, {.i = +1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_K, movestack, {.i = -1}},
-    {MODKEY, XKB_KEY_i, incnmaster, {.i = +1}},
-    {MODKEY, XKB_KEY_d, incnmaster, {.i = -1}},
+    // {MODKEY, XKB_KEY_i, incnmaster, {.i = +1}},
+    // {MODKEY, XKB_KEY_d, incnmaster, {.i = -1}},
     {MODKEY, XKB_KEY_h, setmfact, {.f = -0.05f}},
     {MODKEY, XKB_KEY_l, setmfact, {.f = +0.05f}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_Return, zoom, {0}},
