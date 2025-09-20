@@ -66,6 +66,7 @@ static const Rule rules[] = {
     RULE(.id = "vesktop", .tags = 1 << 2),
     RULE(.id = "mpv", .tags = 1 << 3),
     RULE(.id = "ghostty.capture", .isfloating = 1),
+    RULE(.id = "ghostty.journal", .isfloating = 1),
 
     SCRATCH(.id = "ghostty.term", .isterm = 1, .scratchkey = 't'),
     SCRATCH(.id = "ghostty.note", .isterm = 1, .scratchkey = 'n'),
