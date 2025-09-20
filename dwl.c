@@ -1840,7 +1840,7 @@ void drawbar(Monitor *m) {
   drwl_setscheme(m->drw, colors[SchemeNorm]);
   x = drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, m->ltsymbol, 0);
 
-  if ((w = m->b.width - tw - x) > m->b.height) {
+  if ((w = m->b.width - tw - x) > 0) {
     if (c) {
       drwl_setscheme(m->drw, colors[m == selmon ? SchemeSel : SchemeNorm]);
       tw = TEXTW(m, client_get_title(c));
