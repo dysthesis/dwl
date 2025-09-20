@@ -1874,7 +1874,7 @@ void drawbars(void) {
 
 static int drawstatus(Monitor *m) {
   int x, tw, iw;
-  char rstext[1024] = "";
+  char rstext[2048] = "";
   char *p, *argstart, *argend, *itext;
   uint32_t scheme[3], *color;
 
@@ -3439,7 +3439,7 @@ void startdrag(struct wl_listener *listener, void *data) {
 }
 
 int statusin(int fd, unsigned int mask, void *data) {
-  char status[1024];
+  char status[2048];
   ssize_t n;
   (void)data;
 
