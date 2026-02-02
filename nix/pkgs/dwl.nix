@@ -2,6 +2,7 @@
   lib,
   stdenv,
   installShellFiles,
+  makeWrapper,
   pkg-config,
   wayland,
   wayland-protocols,
@@ -39,6 +40,8 @@
   #     {.v = cmd }.
   #   - comment (string, optional) appends a /* comment */ suffix to the line.
   extraKeybinds ? [ ],
+  # Optional: packages to prepend to dwl's PATH at runtime.
+  extraPathPackages ? [ ],
   # Avoid collision with pkgs.src when using callPackage
   srcDir ? ../..,
 }:
@@ -153,6 +156,7 @@ stdenv.mkDerivation {
     pkg-config
     wayland-scanner
     installShellFiles
+    makeWrapper
   ];
 
   buildInputs =
@@ -266,6 +270,11 @@ stdenv.mkDerivation {
     else
       echo "warning: config.h not found during install" >&2
     fi
+  '';
+
+  postFixup = lib.optionalString (extraPathPackages != [ ]) ''
+    wrapProgram $out/bin/dwl \
+      --prefix PATH : ${lib.makeBinPath extraPathPackages}
   '';
 
   # No tests provided
