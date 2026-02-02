@@ -210,7 +210,7 @@ static const char *notescratch[] = {
     "-As",
     "Notes",
     "-c",
-    "~/Documents/Notes/Contents",
+    "/home/demiurge/Documents/Notes/Contents",
     "direnv",
     "exec",
     ".",
