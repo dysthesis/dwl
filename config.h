@@ -188,9 +188,6 @@ static const char *termcmd[] = {"ghostty", NULL};
 static const char *menucmd[] = {"bemenu-run", NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
-// static const char *scratchpadcmd[] = { "s", "alacritty", "-t", "scratchpad",
-// NULL };
-
 static const char *termscratch[] = {"t", "ghostty", "--class=ghostty.term",
                                     "--title=Terminal", NULL};
 static const char *btopscratch[] = {
@@ -208,12 +205,21 @@ static const char *notescratch[] = {
     "--class=ghostty.note",
     "--title=Notes",
     "-e",
-    "tmux new-session -As Notes -c ~/Documents/Notes/Contents 'direnv exec . "
-    "nvim'",
+    "tmux",
+    "new-session",
+    "-As",
+    "Notes",
+    "-c",
+    "~/Documents/Notes/Contents",
+    "direnv",
+    "exec",
+    ".",
+    "nvim",
     NULL};
 static const char *ircscratch[] = {
-    "i",           "ghostty", "--class=ghostty.irc",
-    "--title=IRC", "-e",      "tmux new-session -As IRC irssi",
+    "i",     "ghostty", "--class=ghostty.irc", "--title=IRC",
+    "-e",    "tmux",    "new-session",         "-As",
+    "IRC",   "irssi",
     NULL};
 static const char *taskscratch[] = {"d",
                                     "ghostty",
