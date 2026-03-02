@@ -37,11 +37,11 @@ let
   configLib = import ../lib/config-h.nix { inherit lib; };
   resolvedConfigSpec =
     if configSpec == null then configLib.defaultSpec else configSpec;
-  generatedConfig =
+  generatedConfigText =
     if resolvedConfigSpec == null then
       null
     else
-      builtins.toFile "config.h" (configLib.generate { spec = resolvedConfigSpec; });
+      configLib.generate { spec = resolvedConfigSpec; };
   # extraKeybinds can come from the config spec (preferred) or legacy argument.
   resolvedExtraKeybinds =
     if resolvedConfigSpec != null && resolvedConfigSpec ? extraKeybinds then
@@ -198,9 +198,11 @@ stdenv.mkDerivation {
 
   # Optionally inject autostart block into config.h prior to build/scan-build
   postPatch = lib.concatStrings [
-    (lib.optionalString (generatedConfig != null) ''
+    (lib.optionalString (generatedConfigText != null) ''
             echo "Generating config.h from Nix spec"
-            cp ${generatedConfig} config.h
+            cat > config.h <<'EOF'
+${generatedConfigText}
+EOF
     '')
     (lib.optionalString (autostart != null) (
       let
