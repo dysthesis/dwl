@@ -1,12 +1,18 @@
 {
   terminal = {
     argv = [ "ghostty" ];
+    # Wayland app_id/class for the terminal, used to mark swallowing parents. If 
+    # omitted, the first argv element is used.
+    appId = "ghostty";
   };
 
   menu = {
     argv = [ "bemenu-run" ];
   };
 
+  # Base client rules. isterm can be injected automatically for swallow
+  # parents via swallowTerminals (see below), but we keep the explicit
+  # ghostty rule to preserve the current behaviour.
   rules = [
     { id = "ghostty"; isterm = true; }
     { id = "zen"; tags = [ 0 ]; }
@@ -15,6 +21,13 @@
     { id = "ghostty.capture"; isfloating = true; }
     { id = "ghostty.journal"; isfloating = true; }
   ];
+
+  # Which app_id(s) should be treated as terminals for autoswallow.
+  # When set, config-h.nix will:
+  #   - force .isterm = true on matching rules
+  #   - add a minimal Rule if no rule exists for a listed id
+  # If omitted, it defaults to [ terminal.appId or head terminal.argv ].
+  swallowTerminals = [ "ghostty" ];
 
   scratchpads = [
     {

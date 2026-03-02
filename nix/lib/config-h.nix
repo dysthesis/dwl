@@ -95,12 +95,38 @@ static const char *${sp.name}[] = {
     else
       lib.concatStringsSep "\n" lines;
 
+  ensureSwallowRules =
+    swallowIds: rules:
+    let
+      markRule =
+        r:
+        if (r ? id) && lib.elem r.id swallowIds then
+          r // { isterm = true; }
+        else
+          r;
+      marked = map markRule rules;
+      existingIds = lib.filter (id: id != null) (map (r: if r ? id then r.id else null) marked);
+      missingIds = lib.subtractLists swallowIds existingIds;
+      extraRules = map (id: { inherit id; isterm = true; }) missingIds;
+    in
+    marked ++ extraRules;
+
   generate =
     {
       spec ? defaultSpec,
       template ? defaultTemplate,
     }:
     let
+      terminalAppId =
+        if spec ? terminal && spec.terminal ? appId then
+          spec.terminal.appId
+        else if spec ? terminal && spec.terminal ? argv && spec.terminal.argv != [ ] then
+          builtins.head spec.terminal.argv
+        else
+          null;
+      swallowTerminals =
+        if spec ? swallowTerminals then spec.swallowTerminals
+        else lib.optional (terminalAppId != null) terminalAppId;
       scratchCmds = renderScratchSection "cmds" (map renderScratchCmd spec.scratchpads);
       scratchpadsByName =
         lib.listToAttrs
@@ -116,9 +142,10 @@ static const char *${sp.name}[] = {
       scratchKeys = renderScratchSection "keys" scratchKeysList;
       termcmd = renderCmdArray "termcmd" spec.terminal.argv;
       menucmd = renderCmdArray "menucmd" spec.menu.argv;
+      processedRules = ensureSwallowRules swallowTerminals spec.rules;
       rules =
         let
-          baseRules = map renderRule spec.rules;
+          baseRules = map renderRule processedRules;
           scratchRules = map (name: renderScratchRule scratchpadsByName.${name}) scratchRuleOrder;
           spacedRules =
             if scratchRules == [ ] then baseRules else baseRules ++ [ "" ] ++ scratchRules;

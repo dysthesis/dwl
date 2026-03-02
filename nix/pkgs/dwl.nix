@@ -21,12 +21,12 @@
   libX11 ? null,
   xwayland ? null,
   enableXWayland ? false,
-  # Optional: inject autostart commands into config.h at build time.
+  # Inject autostart commands into config.h at build time.
   # Format: list of argv vectors, e.g. [ [ "wbg" "/path/img.png" ] [ "foot" "--server" ] ]
   autostart ? null,
-  # Optional: packages to prepend to dwl's PATH at runtime.
+  # Packages to prepend to dwl's PATH at runtime.
   extraPathPackages ? [ ],
-  # Optional: declarative config.h specification; when set, config.h is generated
+  # Declarative config.h specification; when set, config.h is generated
   # from Nix rather than copied from the working tree.
   configSpec ? null,
   # Avoid collision with pkgs.src when using callPackage
