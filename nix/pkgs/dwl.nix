@@ -42,11 +42,23 @@
   extraKeybinds ? [ ],
   # Optional: packages to prepend to dwl's PATH at runtime.
   extraPathPackages ? [ ],
+  # Optional: declarative config.h specification; when set, config.h is generated
+  # from Nix rather than copied from the working tree.
+  configSpec ? null,
   # Avoid collision with pkgs.src when using callPackage
   srcDir ? ../..,
 }:
 
 let
+  configLib = import ../lib/config-h.nix { inherit lib; };
+  resolvedConfigSpec =
+    if configSpec == null then configLib.defaultSpec else configSpec;
+  generatedConfig =
+    if resolvedConfigSpec == null then
+      null
+    else
+      builtins.toFile "config.h" (configLib.generate { spec = resolvedConfigSpec; });
+
   # Render a C string literal from a Nix string
   escapeCStr = s: lib.replaceStrings [ "\\" "\"" "\n" "\t" ] [ "\\\\" "\\\"" "\\n" "\\t" ] s;
   quoteC = s: "\"${escapeCStr s}\"";
@@ -196,6 +208,10 @@ stdenv.mkDerivation {
 
   # Optionally inject autostart block into config.h prior to build/scan-build
   postPatch = lib.concatStrings [
+    (lib.optionalString (generatedConfig != null) ''
+            echo "Generating config.h from Nix spec"
+            cp ${generatedConfig} config.h
+    '')
     (lib.optionalString (autostart != null) (
       let
         block = renderAutostart autostart;

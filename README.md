@@ -59,6 +59,16 @@ manner as dwm. There is no way to separately restart the window manager in
 Wayland without restarting the entire display server, so any changes will take
 effect the next time dwl is executed.
 
+### Nix-driven `config.h`
+
+This repo ships a Nix generator (`nix/lib/config-h.nix`) that renders `config.h`
+from structured data. The default spec in `nix/config/spec.nix` matches the
+tracked `config.h`, including the Ghostty terminal and named scratchpads. You
+can build just the header with `nix build .#config-h`, or override values (for
+example, change `terminal.argv` or add scratchpads) by passing
+`configSpec = <your spec>` to `pkgs.callPackage nix/pkgs/dwl.nix`. The dwl
+derivation now uses this generated header by default.
+
 As in the dwm community, we encourage users to share patches they have
 created. Check out the [dwl-patches] repository!
 

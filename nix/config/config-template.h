@@ -61,20 +61,7 @@ static const char *const autostart[] = {
 #define RULE(...) {.monitor = -1, __VA_ARGS__}
 #define SCRATCH(...) RULE(.isfloating = 1, .w = 0.75, .h = 0.75, __VA_ARGS__)
 static const Rule rules[] = {
-    RULE(.id = "ghostty", .isterm = 1),
-    RULE(.id = "zen", .tags = 1 << 0),
-    RULE(.id = "vesktop", .tags = 1 << 2),
-    RULE(.id = "mpv", .tags = 1 << 3),
-    RULE(.id = "ghostty.capture", .isfloating = 1),
-    RULE(.id = "ghostty.journal", .isfloating = 1),
-
-    SCRATCH(.id = "ghostty.term", .isterm = 1, .scratchkey = 't'),
-    SCRATCH(.id = "ghostty.note", .isterm = 1, .scratchkey = 'n'),
-    SCRATCH(.id = "ghostty.btop", .isterm = 1, .scratchkey = 'b'),
-    SCRATCH(.id = "ghostty.music", .isterm = 1, .scratchkey = 'm'),
-    SCRATCH(.id = "ghostty.irc", .isterm = 1, .scratchkey = 'i'),
-    SCRATCH(.id = "ghostty.task", .isterm = 1, .scratchkey = 'd'),
-    SCRATCH(.id = "signal", .scratchkey = 's'),
+@@RULES@@
 };
 
 /* layout(s) */
@@ -184,31 +171,11 @@ static const enum libinput_config_tap_button_map button_map =
   }
 
 /* commands */
-static const char *termcmd[] = {"ghostty", NULL};
-static const char *menucmd[] = {"bemenu-run", NULL};
+@@TERMCMD@@
+@@MENUCMD@@
 
 /* named scratchpads - First arg only serves to match against key in rules*/
-static const char *termscratch[] = {
-    "t", "ghostty", "--class=ghostty.term", "--title=Terminal", NULL};
-
-static const char *btopscratch[] = {
-    "b", "ghostty", "--class=ghostty.btop", "--title=Btop", "-e", "btop", NULL};
-
-static const char *musicscratch[] = {
-    "m", "ghostty", "--class=ghostty.music", "--title=Music", "-e", "spotify_player", NULL};
-
-static const char *notescratch[] = {
-    "n", "ghostty", "--class=ghostty.note", "--title=Notes", "-e", "tmux", "new-session", "-As", "Notes", "-c", "/home/demiurge/Documents/Notes/Contents", "direnv", "exec", ".", "nvim", NULL};
-
-static const char *ircscratch[] = {
-    "i", "ghostty", "--class=ghostty.irc", "--title=IRC", "-e", "tmux", "new-session", "-As", "IRC", "irssi", NULL};
-
-static const char *taskscratch[] = {
-    "d", "ghostty", "--class=ghostty.task", "--title=Task", "-e", "taskwarrior-tui", NULL};
-
-static const char *signalscratch[] = {
-    "s", "signal-desktop", NULL};
-
+@@SCRATCH_CMDS@@
 
 const char *raisevol[] = {
     "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
@@ -227,13 +194,7 @@ static const Key keys[] = {
     {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
     {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
     {0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = lowerbright}},
-    {MODKEY, XKB_KEY_t, focusortogglematchingscratch, {.v = termscratch}},
-    {MODKEY, XKB_KEY_n, focusortogglematchingscratch, {.v = notescratch}},
-    {MODKEY, XKB_KEY_s, focusortogglematchingscratch, {.v = signalscratch}},
-    {MODKEY, XKB_KEY_b, focusortogglematchingscratch, {.v = btopscratch}},
-    {MODKEY, XKB_KEY_m, focusortogglematchingscratch, {.v = musicscratch}},
-    {MODKEY, XKB_KEY_i, focusortogglematchingscratch, {.v = ircscratch}},
-    {MODKEY, XKB_KEY_d, focusortogglematchingscratch, {.v = taskscratch}},
+@@SCRATCH_KEYS@@
     {MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
     {MODKEY, XKB_KEY_k, focusstack, {.i = -1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_J, movestack, {.i = +1}},

@@ -2,6 +2,9 @@ _: {
   perSystem =
     { config, pkgs, ... }:
     let
+      configLib = import ./lib/config-h.nix { inherit (pkgs) lib; };
+      generatedConfigH = pkgs.writeText "config.h" (configLib.generate { spec = configLib.defaultSpec; });
+
       # Helper to gather common build inputs for C checks
       commonBuildInputs = with pkgs; [
         wayland
@@ -389,6 +392,16 @@ _: {
       checks = {
         # Build the default package (ensures normal build stays green)
         build = config.packages.dwl;
+
+        # Ensure the generated config.h matches the tracked working copy
+        config-h-golden =
+          pkgs.runCommand "config-h-golden"
+            { }
+            ''
+              set -euo pipefail
+              diff -u ${../config.h} ${generatedConfigH}
+              cp ${generatedConfigH} $out
+            '';
 
         # Build with XWayland support toggled on
         build-xwayland = pkgs.callPackage ./pkgs/dwl.nix {
