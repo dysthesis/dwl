@@ -24,22 +24,6 @@
   # Optional: inject autostart commands into config.h at build time.
   # Format: list of argv vectors, e.g. [ [ "wbg" "/path/img.png" ] [ "foot" "--server" ] ]
   autostart ? null,
-  # Optional: append extra Key entries to config.h prior to build.
-  # Format: list of attribute sets. Each entry may use either
-  #   { modifiers = [ "MODKEY" "WLR_MODIFIER_SHIFT" ]; key = "XKB_KEY_F12";
-  #     function = "spawn"; argument = { union = "v"; value = "menucmd"; };
-  #     comment = "launch menu"; }
-  # or
-  #   { mod = "MODKEY"; key = "XKB_KEY_F12"; func = "spawn"; arg = "SHCMD(\"swaylock\")"; }
-  # Fields:
-  #   - modifiers (list of strings) or mod (string) supply the modifier mask.
-  #   - key (string, required) is used verbatim.
-  #   - function / func (string, required) names the handler.
-  #   - argument / arg may be a string, a list of argv strings, a { raw = "..."; }
-  #     block for verbatim C, or a { union = "v"; value = "cmd"; } form to emit
-  #     {.v = cmd }.
-  #   - comment (string, optional) appends a /* comment */ suffix to the line.
-  extraKeybinds ? [ ],
   # Optional: packages to prepend to dwl's PATH at runtime.
   extraPathPackages ? [ ],
   # Optional: declarative config.h specification; when set, config.h is generated
@@ -58,6 +42,12 @@ let
       null
     else
       builtins.toFile "config.h" (configLib.generate { spec = resolvedConfigSpec; });
+  # extraKeybinds can come from the config spec (preferred) or legacy argument.
+  resolvedExtraKeybinds =
+    if resolvedConfigSpec != null && resolvedConfigSpec ? extraKeybinds then
+      resolvedConfigSpec.extraKeybinds
+    else
+      [ ];
 
   # Render a C string literal from a Nix string
   escapeCStr = s: lib.replaceStrings [ "\\" "\"" "\n" "\t" ] [ "\\\\" "\\\"" "\\n" "\\t" ] s;
@@ -246,9 +236,9 @@ stdenv.mkDerivation {
               mv config.h.new config.h
       ''
     ))
-    (lib.optionalString (extraKeybinds != [ ]) (
+    (lib.optionalString (resolvedExtraKeybinds != [ ]) (
       let
-        keyblock = renderKeybindBlock extraKeybinds;
+        keyblock = renderKeybindBlock resolvedExtraKeybinds;
       in
       # sh
       ''

@@ -65,7 +65,7 @@ This repo ships a Nix generator (`nix/lib/config-h.nix`) that renders `config.h`
 from structured data. The default spec in `nix/config/spec.nix` matches the
 tracked `config.h`, including the Ghostty terminal and named scratchpads. You
 can build just the header with `nix build .#config-h`, or override values (for
-example, change `terminal.argv` or add scratchpads) by passing
+example, change `terminal.argv`, add scratchpads, or append `extraKeybinds`) by passing
 `configSpec = <your spec>` to `pkgs.callPackage nix/pkgs/dwl.nix`. The dwl
 derivation now uses this generated header by default.
 

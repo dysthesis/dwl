@@ -126,4 +126,8 @@
     "taskscratch"
     "signalscratch"
   ];
+
+  # Extra keybinds appended to keys[] (same shape as derivation's legacy
+  # extraKeybinds argument).
+  extraKeybinds = [ ];
 }
