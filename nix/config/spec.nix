@@ -1,7 +1,7 @@
 {
   terminal = {
     argv = [ "ghostty" ];
-    # Wayland app_id/class for the terminal, used to mark swallowing parents. If 
+    # Wayland app_id/class for the terminal, used to mark swallowing parents. If
     # omitted, the first argv element is used.
     appId = "ghostty";
   };
@@ -14,12 +14,30 @@
   # parents via swallowTerminals (see below), but we keep the explicit
   # ghostty rule to preserve the current behaviour.
   rules = [
-    { id = "ghostty"; isterm = true; }
-    { id = "zen"; tags = [ 0 ]; }
-    { id = "vesktop"; tags = [ 2 ]; }
-    { id = "mpv"; tags = [ 3 ]; }
-    { id = "ghostty.capture"; isfloating = true; }
-    { id = "ghostty.journal"; isfloating = true; }
+    {
+      id = "ghostty";
+      isterm = true;
+    }
+    {
+      id = "zen";
+      tags = [ 0 ];
+    }
+    {
+      id = "vesktop";
+      tags = [ 2 ];
+    }
+    {
+      id = "mpv";
+      tags = [ 3 ];
+    }
+    {
+      id = "ghostty.capture";
+      isfloating = true;
+    }
+    {
+      id = "ghostty.journal";
+      isfloating = true;
+    }
   ];
 
   # Which app_id(s) should be treated as terminals for autoswallow.
@@ -27,7 +45,8 @@
   #   - force .isterm = true on matching rules
   #   - add a minimal Rule if no rule exists for a listed id
   # If omitted, it defaults to [ terminal.appId or head terminal.argv ].
-  swallowTerminals = [ "ghostty" ];
+  # foot/footclient are expanded automatically so foot works in standalone and
+  # server mode without extra rules.
 
   scratchpads = [
     {
@@ -36,7 +55,11 @@
       keysym = "XKB_KEY_t";
       id = "ghostty.term";
       isterm = true;
-      argv = [ "ghostty" "--class=ghostty.term" "--title=Terminal" ];
+      argv = [
+        "ghostty"
+        "--class=ghostty.term"
+        "--title=Terminal"
+      ];
     }
     {
       name = "btopscratch";
@@ -44,7 +67,13 @@
       keysym = "XKB_KEY_b";
       id = "ghostty.btop";
       isterm = true;
-      argv = [ "ghostty" "--class=ghostty.btop" "--title=Btop" "-e" "btop" ];
+      argv = [
+        "ghostty"
+        "--class=ghostty.btop"
+        "--title=Btop"
+        "-e"
+        "btop"
+      ];
     }
     {
       name = "musicscratch";
@@ -107,7 +136,13 @@
       keysym = "XKB_KEY_d";
       id = "ghostty.task";
       isterm = true;
-      argv = [ "ghostty" "--class=ghostty.task" "--title=Task" "-e" "taskwarrior-tui" ];
+      argv = [
+        "ghostty"
+        "--class=ghostty.task"
+        "--title=Task"
+        "-e"
+        "taskwarrior-tui"
+      ];
     }
     {
       name = "signalscratch";

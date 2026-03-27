@@ -3529,6 +3529,7 @@ void tagmon(const Arg *arg) {
 
 Client *termforwin(Client *c) {
   Client *p;
+  Client *focused = focustop(selmon);
   pid_t pid;
   pid_t pids[32];
   size_t i, pids_len;
@@ -3544,6 +3545,15 @@ Client *termforwin(Client *c) {
     if (!pid)
       break;
     pids[pids_len++] = pid;
+  }
+
+  /* foot --server windows share one client pid, so prefer the currently
+   * focused terminal when multiple isterm clients match the same parent pid. */
+  if (focused && focused->pid && focused->isterm && !focused->swallowedby) {
+    for (i = 0; i < pids_len; i++) {
+      if (pids[i] == focused->pid)
+        return focused;
+    }
   }
 
   /* Find closest parent */

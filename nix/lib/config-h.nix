@@ -24,9 +24,9 @@ let
       rendered = lib.concatStringsSep ", " (map quoteC args ++ [ "NULL" ]);
     in
     ''
-static const char *${sp.name}[] = {
-    ${rendered}};
-''; # keep trailing newline to mirror config.h style
+      static const char *${sp.name}[] = {
+          ${rendered}};
+    ''; # keep trailing newline to mirror config.h style
 
   renderTags =
     tags:
@@ -41,21 +41,20 @@ static const char *${sp.name}[] = {
   renderRuleFields =
     r:
     let
-      fields =
-        [
-          (".id = " + quoteC r.id)
-        ]
-        ++ lib.optional (r ? title) (".title = " + quoteC r.title)
-        ++ lib.optional (r ? tags) (".tags = " + renderTags r.tags)
-        ++ lib.optional (r ? isfloating) (".isfloating = " + boolInt r.isfloating)
-        ++ lib.optional (r ? isterm) (".isterm = " + boolInt r.isterm)
-        ++ lib.optional (r ? noswallow) (".noswallow = " + boolInt r.noswallow)
-        ++ lib.optional (r ? monitor) (".monitor = " + builtins.toString r.monitor)
-        ++ lib.optional (r ? scratchkey) (".scratchkey = '" + r.scratchkey + "'")
-        ++ lib.optional (r ? x) (".x = " + builtins.toString r.x)
-        ++ lib.optional (r ? y) (".y = " + builtins.toString r.y)
-        ++ lib.optional (r ? w) (".w = " + builtins.toString r.w)
-        ++ lib.optional (r ? h) (".h = " + builtins.toString r.h);
+      fields = [
+        (".id = " + quoteC r.id)
+      ]
+      ++ lib.optional (r ? title) (".title = " + quoteC r.title)
+      ++ lib.optional (r ? tags) (".tags = " + renderTags r.tags)
+      ++ lib.optional (r ? isfloating) (".isfloating = " + boolInt r.isfloating)
+      ++ lib.optional (r ? isterm) (".isterm = " + boolInt r.isterm)
+      ++ lib.optional (r ? noswallow) (".noswallow = " + boolInt r.noswallow)
+      ++ lib.optional (r ? monitor) (".monitor = " + builtins.toString r.monitor)
+      ++ lib.optional (r ? scratchkey) (".scratchkey = '" + r.scratchkey + "'")
+      ++ lib.optional (r ? x) (".x = " + builtins.toString r.x)
+      ++ lib.optional (r ? y) (".y = " + builtins.toString r.y)
+      ++ lib.optional (r ? w) (".w = " + builtins.toString r.w)
+      ++ lib.optional (r ? h) (".h = " + builtins.toString r.h);
     in
     lib.concatStringsSep ", " fields;
 
@@ -64,20 +63,19 @@ static const char *${sp.name}[] = {
   renderScratchRule =
     sp:
     let
-      fields =
-        [
-          (".id = " + quoteC sp.id)
-        ]
-        ++ lib.optional (sp ? isterm) (".isterm = " + boolInt sp.isterm)
-        ++ lib.optional (sp ? noswallow) (".noswallow = " + boolInt sp.noswallow)
-        ++ lib.optional (sp ? monitor) (".monitor = " + builtins.toString sp.monitor)
-        ++ [
-          (".scratchkey = '" + sp.key + "'")
-        ]
-        ++ lib.optional (sp ? x) (".x = " + builtins.toString sp.x)
-        ++ lib.optional (sp ? y) (".y = " + builtins.toString sp.y)
-        ++ lib.optional (sp ? w) (".w = " + builtins.toString sp.w)
-        ++ lib.optional (sp ? h) (".h = " + builtins.toString sp.h);
+      fields = [
+        (".id = " + quoteC sp.id)
+      ]
+      ++ lib.optional (sp ? isterm) (".isterm = " + boolInt sp.isterm)
+      ++ lib.optional (sp ? noswallow) (".noswallow = " + boolInt sp.noswallow)
+      ++ lib.optional (sp ? monitor) (".monitor = " + builtins.toString sp.monitor)
+      ++ [
+        (".scratchkey = '" + sp.key + "'")
+      ]
+      ++ lib.optional (sp ? x) (".x = " + builtins.toString sp.x)
+      ++ lib.optional (sp ? y) (".y = " + builtins.toString sp.y)
+      ++ lib.optional (sp ? w) (".w = " + builtins.toString sp.w)
+      ++ lib.optional (sp ? h) (".h = " + builtins.toString sp.h);
     in
     "    SCRATCH(" + lib.concatStringsSep ", " fields + "),";
 
@@ -90,24 +88,19 @@ static const char *${sp.name}[] = {
 
   renderScratchSection =
     name: lines:
-    if lines == [ ] then
-      "    /* no scratchpads defined */"
-    else
-      lib.concatStringsSep "\n" lines;
+    if lines == [ ] then "    /* no scratchpads defined */" else lib.concatStringsSep "\n" lines;
 
   ensureSwallowRules =
     swallowIds: rules:
     let
-      markRule =
-        r:
-        if (r ? id) && lib.elem r.id swallowIds then
-          r // { isterm = true; }
-        else
-          r;
+      markRule = r: if (r ? id) && lib.elem r.id swallowIds then r // { isterm = true; } else r;
       marked = map markRule rules;
       existingIds = lib.filter (id: id != null) (map (r: if r ? id then r.id else null) marked);
-      missingIds = lib.subtractLists swallowIds existingIds;
-      extraRules = map (id: { inherit id; isterm = true; }) missingIds;
+      missingIds = lib.subtractLists existingIds swallowIds;
+      extraRules = map (id: {
+        inherit id;
+        isterm = true;
+      }) missingIds;
     in
     marked ++ extraRules;
 
@@ -124,20 +117,32 @@ static const char *${sp.name}[] = {
           builtins.head spec.terminal.argv
         else
           null;
+      defaultSwallowTerminals =
+        if terminalAppId == null then
+          [ ]
+        else if
+          lib.elem terminalAppId [
+            "foot"
+            "footclient"
+          ]
+        then
+          [
+            "foot"
+            "footclient"
+          ]
+        else
+          [ terminalAppId ];
       swallowTerminals =
-        if spec ? swallowTerminals then spec.swallowTerminals
-        else lib.optional (terminalAppId != null) terminalAppId;
+        if spec ? swallowTerminals then spec.swallowTerminals else defaultSwallowTerminals;
       scratchCmds = renderScratchSection "cmds" (map renderScratchCmd spec.scratchpads);
-      scratchpadsByName =
-        lib.listToAttrs
-          (map (sp: {
-            name = sp.name;
-            value = sp;
-          }) spec.scratchpads);
-      scratchRuleOrder =
-        spec.scratchRuleOrder or (map (sp: sp.name) spec.scratchpads);
-      scratchKeyOrder =
-        spec.scratchKeyOrder or (map (sp: sp.name) spec.scratchpads);
+      scratchpadsByName = lib.listToAttrs (
+        map (sp: {
+          name = sp.name;
+          value = sp;
+        }) spec.scratchpads
+      );
+      scratchRuleOrder = spec.scratchRuleOrder or (map (sp: sp.name) spec.scratchpads);
+      scratchKeyOrder = spec.scratchKeyOrder or (map (sp: sp.name) spec.scratchpads);
       scratchKeysList = map (name: renderScratchKeys scratchpadsByName.${name}) scratchKeyOrder;
       scratchKeys = renderScratchSection "keys" scratchKeysList;
       termcmd = renderCmdArray "termcmd" spec.terminal.argv;
@@ -147,8 +152,7 @@ static const char *${sp.name}[] = {
         let
           baseRules = map renderRule processedRules;
           scratchRules = map (name: renderScratchRule scratchpadsByName.${name}) scratchRuleOrder;
-          spacedRules =
-            if scratchRules == [ ] then baseRules else baseRules ++ [ "" ] ++ scratchRules;
+          spacedRules = if scratchRules == [ ] then baseRules else baseRules ++ [ "" ] ++ scratchRules;
         in
         renderScratchSection "rules" spacedRules;
       replacements = {
@@ -158,9 +162,7 @@ static const char *${sp.name}[] = {
         "@@RULES@@" = rules;
         "@@SCRATCH_KEYS@@" = scratchKeys;
       };
-      applyReplacement =
-        acc: key:
-        lib.replaceStrings [ key ] [ replacements.${key} ] acc;
+      applyReplacement = acc: key: lib.replaceStrings [ key ] [ replacements.${key} ] acc;
     in
     lib.foldl applyReplacement template (lib.attrNames replacements);
 in

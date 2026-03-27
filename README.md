@@ -67,7 +67,10 @@ tracked `config.h`, including the Ghostty terminal and named scratchpads. You
 can build just the header with `nix build .#config-h`, or override values (for
 example, change `terminal.argv`, add scratchpads, or append `extraKeybinds`) by passing
 `configSpec = <your spec>` to `pkgs.callPackage nix/pkgs/dwl.nix`. The dwl
-derivation now uses this generated header by default.
+derivation now uses this generated header by default. When you switch the
+terminal to foot, the generator now treats both `foot` and `footclient` as
+swallow parents by default so autoswallow works in both standalone and
+server-mode setups.
 
 As in the dwm community, we encourage users to share patches they have
 created. Check out the [dwl-patches] repository!
