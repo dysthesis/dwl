@@ -668,7 +668,7 @@ void applyrules(Client *c) {
 
   /* autoswallow newly mapped clients spawned from a terminal */
   if (enableautoswallow && !c->noswallow && !c->isfloating &&
-      !c->surface.xdg->initial_commit) {
+      (client_is_x11(c) || !c->surface.xdg->initial_commit)) {
     Client *p = termforwin(c);
     if (p)
       swallow(c, p);
@@ -860,8 +860,7 @@ void autostartexec(void) {
   for (p = autostart; *p; i++, p++) {
     if ((autostart_pids[i] = fork()) == 0) {
       setsid();
-      /* flawfinder: ignore (intentional program exec; argv is from trusted
-       * config.h) */
+      /* flawfinder: ignore */
       execvp(*p, (char *const *)p);
       die("dwl: execvp %s:", *p);
     }
@@ -2192,7 +2191,7 @@ void focusstack(const Arg *arg) {
 Client *focustop(Monitor *m) {
   Client *c;
   wl_list_for_each(c, &fstack, flink) {
-    if (SVISIBLEON(c, m))
+    if (VISIBLEON(c, m))
       return c;
   }
   return NULL;
@@ -2269,7 +2268,7 @@ void handlesig(int signo) {
   }
 }
 
-void incnmaster(const Arg *arg) {
+void __attribute__((unused)) incnmaster(const Arg *arg) {
   if (!arg || !selmon)
     return;
   selmon->nmaster = pertag.nmasters[selmon->pertag[selmon->seltags]] =
@@ -2494,10 +2493,16 @@ void mapnotify(struct wl_listener *listener, void *data) {
 
 unset_fullscreen:
   m = c->mon ? c->mon : xytomon(c->geom.x, c->geom.y);
-  wl_list_for_each(w, &clients, link) {
-    if (w != c && w != p && w->isfullscreen && m == w->mon &&
-        (w->tags & c->tags))
-      setfullscreen(w, 0);
+  if (m && clients.next && clients.prev) {
+    struct wl_list *node, *next;
+
+    for (node = clients.next; node && node != &clients; node = next) {
+      next = node->next;
+      w = wl_container_of(node, c, link);
+      if (w != c && w != p && w->isfullscreen && m == w->mon &&
+          (w->tags & c->tags))
+        setfullscreen(w, 0);
+    }
   }
 }
 
@@ -2608,10 +2613,17 @@ void motionnotify(uint32_t time, struct wlr_input_device *device, double dx,
       surface != seat->pointer_state.focused_surface &&
       toplevel_from_wlr_surface(seat->pointer_state.focused_surface, &w, &l) >=
           0) {
-    c = w;
-    surface = seat->pointer_state.focused_surface;
-    sx = cursor->x - (l ? l->scene->node.x : w->geom.x);
-    sy = cursor->y - (l ? l->scene->node.y : w->geom.y);
+    if (l) {
+      c = w;
+      surface = seat->pointer_state.focused_surface;
+      sx = cursor->x - l->scene->node.x;
+      sy = cursor->y - l->scene->node.y;
+    } else if (w) {
+      c = w;
+      surface = seat->pointer_state.focused_surface;
+      sx = cursor->x - w->geom.x;
+      sy = cursor->y - w->geom.y;
+    }
   }
 
   /* time is 0 in internal calls meant to restore pointer focus. */
@@ -2958,8 +2970,7 @@ void run(char *startup_cmd) {
       setsid();
       close(piperw[0]);
       close(piperw[1]);
-      /* flawfinder: ignore (intentional shell invocation; startup_cmd comes
-       * from CLI flag or wlroots environment) */
+      /* flawfinder: ignore */
       execl("/bin/sh", "/bin/sh", "-c", startup_cmd, NULL);
       die("startup: execl:");
     }
@@ -3414,8 +3425,7 @@ void spawn(const Arg *arg) {
     close(STDIN_FILENO);
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
-    /* flawfinder: ignore (intentional program exec; argv is from trusted
-     * keybindings) */
+    /* flawfinder: ignore */
     execvp(((char **)arg->v)[0], (char **)arg->v);
     die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
   }
@@ -3425,8 +3435,7 @@ void spawnscratch(const Arg *arg) {
   if (fork() == 0) {
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
-    /* flawfinder: ignore (intentional program exec; argv is from trusted
-     * keybindings) */
+    /* flawfinder: ignore */
     execvp(((char **)arg->v)[1], ((char **)arg->v) + 1);
     die("dwl: execvp %s failed:", ((char **)arg->v)[1]);
   }
@@ -3466,15 +3475,18 @@ int statusin(int fd, unsigned int mask, void *data) {
 }
 
 void swallow(Client *c, Client *toswallow) {
-  /* Do not allow a client to swallow itself */
-  if (c == toswallow)
+  Client *swallowed;
+
+  if (!c || c == toswallow)
     return;
 
-  /* Swallow */
-  if (toswallow && !c->swallowing) {
+  if (toswallow) {
+    if (c->swallowing || c->swallowedby || toswallow->swallowing ||
+        toswallow->swallowedby)
+      return;
+
     c->swallowing = toswallow;
     toswallow->swallowedby = c;
-    toswallow->mon = c->mon;
     toswallow->mon = c->mon;
     wl_list_remove(&c->link);
     wl_list_insert(&c->swallowing->link, &c->link);
@@ -3485,20 +3497,22 @@ void swallow(Client *c, Client *toswallow) {
     c->isfloating = toswallow->isfloating;
     c->geom = toswallow->geom;
     setfullscreen(toswallow, 0);
+    return;
   }
 
-  /* Unswallow */
-  else if (c->swallowing) {
-    wl_list_remove(&c->swallowing->link);
-    wl_list_insert(&c->link, &c->swallowing->link);
-    wl_list_remove(&c->swallowing->flink);
-    wl_list_insert(&c->flink, &c->swallowing->flink);
-    c->swallowing->tags = c->tags;
-    c->swallowing->swallowedby = NULL;
-    c->swallowing = NULL;
-    c->bw = BORDERPX(c);
-    setfullscreen(c, 0);
-  }
+  swallowed = c->swallowing;
+  if (!swallowed)
+    return;
+
+  c->swallowing = NULL;
+  swallowed->swallowedby = NULL;
+  wl_list_remove(&swallowed->link);
+  wl_list_insert(&c->link, &swallowed->link);
+  wl_list_remove(&swallowed->flink);
+  wl_list_insert(&c->flink, &swallowed->flink);
+  swallowed->tags = c->tags;
+  c->bw = BORDERPX(c);
+  setfullscreen(c, 0);
 }
 
 void tag(const Arg *arg) {
@@ -3549,7 +3563,8 @@ Client *termforwin(Client *c) {
 
   /* foot --server windows share one client pid, so prefer the currently
    * focused terminal when multiple isterm clients match the same parent pid. */
-  if (focused && focused->pid && focused->isterm && !focused->swallowedby) {
+  if (focused && focused->pid && focused->isterm && !focused->swallowedby &&
+      !focused->swallowing) {
     for (i = 0; i < pids_len; i++) {
       if (pids[i] == focused->pid)
         return focused;
@@ -3559,7 +3574,7 @@ Client *termforwin(Client *c) {
   /* Find closest parent */
   for (i = 0; i < pids_len; i++) {
     wl_list_for_each(p, &clients, link) {
-      if (!p->pid || !p->isterm || p->swallowedby)
+      if (!p->pid || !p->isterm || p->swallowedby || p->swallowing)
         continue;
       if (pids[i] == p->pid)
         return p;
@@ -3671,13 +3686,12 @@ void toggleswallow(const Arg *arg) {
   if (sel->swallowing) {
     swallow(sel, NULL);
   } else {
-    wl_list_for_each(c, &sel->flink, flink) {
-      if (&c->flink == &fstack)
-        continue; /* wrap past the sentinel node */
-      if (VISIBLEON(c, selmon))
-        break; /* found it */
+    wl_list_for_each(c, &fstack, flink) {
+      if (c == sel || !VISIBLEON(c, selmon) || c->swallowing || c->swallowedby)
+        continue;
+      swallow(sel, c);
+      return;
     }
-    swallow(sel, c);
   }
 }
 
@@ -3750,15 +3764,18 @@ void unmaplayersurfacenotify(struct wl_listener *listener, void *data) {
 void unmapnotify(struct wl_listener *listener, void *data) {
   /* Called when the surface is unmapped, and should no longer be shown. */
   Client *c = wl_container_of(listener, c, unmap);
+  Client *swallowed = c->swallowing;
+  Client *swallower = c->swallowedby;
   if (c == grabc) {
     cursor_mode = CurNormal;
     grabc = NULL;
   }
 
-  if (c->swallowing) {
+  if (swallowed) {
     swallow(c, NULL);
-  } else if (c->swallowedby) {
-    swallow(c->swallowedby, NULL);
+  }
+  if (swallower && swallower->swallowing == c) {
+    swallow(swallower, NULL);
   }
 
   if (client_is_unmanaged(c)) {
@@ -4225,8 +4242,7 @@ int main(int argc, char *argv[]) {
   char *startup_cmd = NULL;
   int c;
 
-  /* flawfinder: ignore (getopt is standard and bounded by argv; our use is
-   * safe) */
+  /* flawfinder: ignore */
   while ((c = getopt(argc, argv, "s:hdv")) != -1) {
     if (c == 's')
       startup_cmd = optarg;
@@ -4241,7 +4257,7 @@ int main(int argc, char *argv[]) {
     goto usage;
 
   /* Wayland requires XDG_RUNTIME_DIR for creating its communications socket */
-  /* flawfinder: ignore (environment var checked for presence only) */
+  /* flawfinder: ignore */
   if (!getenv("XDG_RUNTIME_DIR"))
     die("XDG_RUNTIME_DIR must be set");
   setup();

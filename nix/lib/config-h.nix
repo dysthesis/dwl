@@ -87,7 +87,7 @@ let
     "    {MODKEY, " + keysym + ", focusortogglematchingscratch, {.v = " + sp.name + "}},";
 
   renderScratchSection =
-    name: lines:
+    _: lines:
     if lines == [ ] then "    /* no scratchpads defined */" else lib.concatStringsSep "\n" lines;
 
   ensureSwallowRules =
@@ -95,7 +95,7 @@ let
     let
       markRule = r: if (r ? id) && lib.elem r.id swallowIds then r // { isterm = true; } else r;
       marked = map markRule rules;
-      existingIds = lib.filter (id: id != null) (map (r: if r ? id then r.id else null) marked);
+      existingIds = lib.filter (id: id != null) (map (r: r.id or null) marked);
       missingIds = lib.subtractLists existingIds swallowIds;
       extraRules = map (id: {
         inherit id;
@@ -132,12 +132,11 @@ let
           ]
         else
           [ terminalAppId ];
-      swallowTerminals =
-        if spec ? swallowTerminals then spec.swallowTerminals else defaultSwallowTerminals;
+      swallowTerminals = spec.swallowTerminals or defaultSwallowTerminals;
       scratchCmds = renderScratchSection "cmds" (map renderScratchCmd spec.scratchpads);
       scratchpadsByName = lib.listToAttrs (
         map (sp: {
-          name = sp.name;
+          inherit (sp) name;
           value = sp;
         }) spec.scratchpads
       );

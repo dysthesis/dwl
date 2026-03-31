@@ -35,13 +35,9 @@
 
 let
   configLib = import ../lib/config-h.nix { inherit lib; };
-  resolvedConfigSpec =
-    if configSpec == null then configLib.defaultSpec else configSpec;
+  resolvedConfigSpec = if configSpec == null then configLib.defaultSpec else configSpec;
   generatedConfigText =
-    if resolvedConfigSpec == null then
-      null
-    else
-      configLib.generate { spec = resolvedConfigSpec; };
+    if resolvedConfigSpec == null then null else configLib.generate { spec = resolvedConfigSpec; };
   # extraKeybinds can come from the config spec (preferred) or legacy argument.
   resolvedExtraKeybinds =
     if resolvedConfigSpec != null && resolvedConfigSpec ? extraKeybinds then
@@ -66,7 +62,8 @@ let
       };'';
 
   escapeComment = c: lib.replaceStrings [ "*/" ] [ "* /" ] c;
-  renderArgArray = union: argv:
+  renderArgArray =
+    union: argv:
     let
       quoted = map quoteC argv;
       joined = lib.concatStringsSep ", " quoted;
@@ -82,10 +79,7 @@ let
   renderArg =
     kb:
     let
-      arg =
-        if kb ? argument then kb.argument
-        else if kb ? arg then kb.arg
-        else null;
+      arg = kb.argument or (kb.arg or null);
     in
     if arg == null then
       "{0}"
@@ -150,7 +144,7 @@ stdenv.mkDerivation {
   # Keep in sync with config.mk's _VERSION default; the runtime binary also embeds VERSION.
   version = "0.8-dev";
 
-  src = srcDir;
+  src = lib.cleanSource srcDir;
 
   strictDeps = true;
 
@@ -199,10 +193,10 @@ stdenv.mkDerivation {
   # Optionally inject autostart block into config.h prior to build/scan-build
   postPatch = lib.concatStrings [
     (lib.optionalString (generatedConfigText != null) ''
-            echo "Generating config.h from Nix spec"
-            cat > config.h <<'EOF'
-${generatedConfigText}
-EOF
+                  echo "Generating config.h from Nix spec"
+                  cat > config.h <<'EOF'
+      ${generatedConfigText}
+      EOF
     '')
     (lib.optionalString (autostart != null) (
       let

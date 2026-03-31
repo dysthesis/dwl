@@ -23,6 +23,97 @@ _: {
         xcbutilwm
       ];
 
+      xMakeFlags =
+        enableXWayland:
+        pkgs.lib.optionals enableXWayland [
+          ''XWAYLAND="-DXWAYLAND"''
+          ''XLIBS="xcb xcb-icccm"''
+        ];
+
+      renderMakeFlags = flags: pkgs.lib.concatStringsSep " " flags;
+
+      sanitizerLogPattern = "AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:|Shadow memory range interleaves";
+
+      mkSanitizedDwl =
+        {
+          enableXWayland ? false,
+        }:
+        (pkgs.callPackage ./pkgs/dwl.nix {
+          stdenv = pkgs.clangStdenv;
+          inherit enableXWayland;
+          inherit (pkgs) xorg;
+          autostart = [ ];
+        }).overrideAttrs
+          (prev: {
+            makeFlags = (prev.makeFlags or [ ]) ++ [
+              "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-pie"
+              "LDFLAGS+=-fsanitize=address,undefined -no-pie"
+            ];
+            hardeningDisable = (prev.hardeningDisable or [ ]) ++ [ "pie" ];
+            __structuredAttrs = true;
+          });
+
+      mkSanitizedRunCheck =
+        {
+          name,
+          enableXWayland ? false,
+          runtimeInputs ? [ ],
+          startupScript,
+          timeoutSeconds ? 8,
+        }:
+        let
+          sanPkg = mkSanitizedDwl { inherit enableXWayland; };
+        in
+        pkgs.runCommand name
+          {
+            buildInputs = [
+              sanPkg
+              pkgs.bash
+              pkgs.coreutils
+              pkgs.ripgrep
+            ]
+            ++ runtimeInputs;
+          }
+          ''
+            set -euo pipefail
+            export ASAN_OPTIONS=detect_leaks=0:strict_init_order=1:abort_on_error=1
+            export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1
+            export XDG_RUNTIME_DIR="$PWD/xdg"
+            mkdir -p "$XDG_RUNTIME_DIR"
+            chmod 700 "$XDG_RUNTIME_DIR"
+            export WLR_BACKENDS=headless
+            export WLR_HEADLESS_OUTPUTS=1
+            export WLR_RENDERER=pixman
+            export WLR_RENDERER_ALLOW_SOFTWARE=1
+
+            cat > startup.sh <<'EOF'
+            #!${pkgs.bash}/bin/bash
+            set -euo pipefail
+            ${startupScript}
+            EOF
+            chmod +x startup.sh
+
+            log="$PWD/${name}.log"
+            status=0
+            ${pkgs.coreutils}/bin/timeout -k 2s ${builtins.toString timeoutSeconds}s \
+              ${sanPkg}/bin/dwl -s "$PWD/startup.sh" >"$log" 2>&1 || status=$?
+
+            if ${pkgs.ripgrep}/bin/rg -n "${sanitizerLogPattern}" "$log" >/dev/null; then
+              cat "$log"
+              echo "Sanitizer failure detected in ${name}" >&2
+              exit 1
+            fi
+
+            if [ "$status" -ne 124 ]; then
+              cat "$log"
+              echo "dwl exited unexpectedly in ${name} (status=$status)" >&2
+              exit 1
+            fi
+
+            mkdir -p "$out"
+            cp "$log" "$out/log"
+          '';
+
       # Flawfinder source scan (quick SAST over C sources)
       mkFlawfinder =
         pkgs.runCommand "flawfinder-check"
@@ -79,18 +170,14 @@ _: {
             export CC=clang
             # Capture build and analyze; keep artifacts even if issues are found
             status=0
-            enable_x=${if enableXWayland then "1" else "0"}
-            if [ "$enable_x" = "1" ]; then
-              xargs="XWAYLAND=-DXWAYLAND XLIBS=xcb\\ xcb-icccm"
-            else
-              xargs=""
-            fi
             infer run \
               --keep-going \
               --results-dir infer-out \
               --fail-on-issue \
               -- \
-              make WAYLAND_SCANNER=$(command -v wayland-scanner) $xargs \
+              make ${
+                renderMakeFlags ([ "WAYLAND_SCANNER=$(command -v wayland-scanner)" ] ++ xMakeFlags enableXWayland)
+              } \
               || status=$?
             echo "$status" > infer-status
           '';
@@ -155,6 +242,7 @@ _: {
                 -I*|-D*) FILTERED="$FILTERED $t" ;;
               esac
             done
+            FILTERED="$FILTERED -DWLR_USE_UNSTABLE${pkgs.lib.optionalString enableXWayland " -DXWAYLAND"}"
 
             echo "Running cppcheck..."
             # Analyze all C files in the tree root (dwl.c, util.c)
@@ -221,6 +309,7 @@ _: {
                 -I*|-D*) FILTERED="$FILTERED $t" ;;
               esac
             done
+            FILTERED="$FILTERED${pkgs.lib.optionalString enableXWayland " -DXWAYLAND"}"
 
             echo "Running clang-tidy (clang-analyzer checks only)..."
             sources=$(ls *.c)
@@ -273,7 +362,11 @@ _: {
               --use-cc="$CC" \
               --use-c++="$CXX" \
               -o "$TMPDIR/scan-report" \
-              make WAYLAND_SCANNER=${pkgs.wayland-scanner.bin}/bin/wayland-scanner
+              make ${
+                renderMakeFlags (
+                  [ "WAYLAND_SCANNER=${pkgs.wayland-scanner.bin}/bin/wayland-scanner" ] ++ xMakeFlags enableXWayland
+                )
+              }
           '';
           installPhase = ''
             mkdir -p $out
@@ -292,53 +385,43 @@ _: {
         {
           enableXWayland ? false,
         }:
-        let
-          sanPkg =
-            (pkgs.callPackage ./pkgs/dwl.nix {
-              stdenv = pkgs.clangStdenv;
-              inherit enableXWayland;
-              inherit (pkgs) xorg;
-              # Disable repo autostart to avoid unknown commands in CI
-              autostart = [ ];
-            }).overrideAttrs
-              (prev: {
-                makeFlags = (prev.makeFlags or [ ]) ++ [
-                  "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
-                  "LDFLAGS+=-fsanitize=address,undefined"
-                ];
-                __structuredAttrs = true;
-              });
-        in
-        pkgs.runCommand "dwl-asan-ubsan-smoketest"
-          {
-            buildInputs = [
-              sanPkg
-              pkgs.coreutils
-              pkgs.bash
-              pkgs.toybox
-              pkgs.foot
-              pkgs.wmenu
-            ];
-          }
-          ''
-            set -euo pipefail
-            export ASAN_OPTIONS=detect_leaks=0:strict_init_order=1:abort_on_error=1
-            export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:abort_on_error=1
-            export XDG_RUNTIME_DIR="$PWD/xdg"
-            mkdir -p "$XDG_RUNTIME_DIR"
-            chmod 700 "$XDG_RUNTIME_DIR"
-            export WLR_BACKENDS=headless
-            export WLR_RENDERER_ALLOW_SOFTWARE=1
-            # Exercise client create/map/unmap and compositor run loop.
-            # - Start dwl with a startup script that launches a couple of clients
-            #   and then exits successfully, while we still guard with timeout.
-            ${pkgs.coreutils}/bin/timeout 8s ${sanPkg}/bin/dwl -s \
-              "${pkgs.bash}/bin/bash -ceu ' \
-                 (${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &) ; \
-                 (printf %s\\n x | ${pkgs.wmenu}/bin/wmenu -p test >/dev/null 2>&1 &) ; \
-                 sleep 1 ; exit 0 '" || true
-            touch "$out"
+        mkSanitizedRunCheck {
+          name = if enableXWayland then "dwl-asan-ubsan-smoketest-xwayland" else "dwl-asan-ubsan-smoketest";
+          inherit enableXWayland;
+          runtimeInputs = [
+            pkgs.foot
+            pkgs.wmenu
+          ]
+          ++ pkgs.lib.optionals enableXWayland [ pkgs.xorg.xmessage ];
+          startupScript = ''
+            ${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &
+            sleep 1
+            printf '%s\n' x | ${pkgs.wmenu}/bin/wmenu -p test >/dev/null 2>&1 &
+            ${pkgs.lib.optionalString enableXWayland ''
+              sleep 1
+              ${pkgs.xorg.xmessage}/bin/xmessage -buttons OK:0 -timeout 1 smoke >/dev/null 2>&1 &
+            ''}
+            sleep 2
           '';
+        };
+
+      mkSwallowRegression = mkSanitizedRunCheck {
+        name = "dwl-swallow-regression";
+        runtimeInputs = [
+          pkgs.bash
+          pkgs.foot
+          pkgs.mpv
+        ];
+        timeoutSeconds = 12;
+        startupScript = ''
+          ${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &
+          sleep 1
+          ${pkgs.foot}/bin/footclient -e ${pkgs.bash}/bin/bash -lc \
+            'sleep 1; exec ${pkgs.mpv}/bin/mpv --no-config --ao=null --vo=gpu --gpu-context=wayland --frames=2 av://lavfi:testsrc2=size=128x128:rate=1' \
+            >/dev/null 2>&1 &
+          sleep 6
+        '';
+      };
 
       # Strict warnings-as-errors build using a curated warning set
       mkWarningsStrict =
@@ -355,10 +438,10 @@ _: {
         base.overrideAttrs (prev: {
           NIX_CFLAGS_COMPILE =
             (prev.NIX_CFLAGS_COMPILE or "")
-            + " -Wall -Wextra -Werror -Wformat=2 -Wvla -Wshadow -Wcast-align"
-            + " -Wpointer-arith -Wstrict-prototypes -Wconversion -Wsign-conversion"
-            + " -Wno-unused-parameter -Wno-implicit-int-conversion -Wno-implicit-int-float-conversion"
-            + " -Wno-sign-conversion -Wno-cast-align -Wno-vla -Wno-format-nonliteral";
+            + " -Wall -Wextra -Werror -Wformat=2 -Wpointer-arith"
+            + " -Wshadow -Wstrict-prototypes -Wconversion"
+            + " -Wno-unused-parameter -Wno-sign-conversion -Wno-vla -Wno-implicit-int-conversion"
+            + " -Wno-implicit-int-float-conversion -Wno-format-nonliteral";
         });
 
       # Strict Clang build (treat warnings as errors)
@@ -394,14 +477,11 @@ _: {
         build = config.packages.dwl;
 
         # Ensure the generated config.h matches the tracked working copy
-        config-h-golden =
-          pkgs.runCommand "config-h-golden"
-            { }
-            ''
-              set -euo pipefail
-              diff -u ${../config.h} ${generatedConfigH}
-              cp ${generatedConfigH} $out
-            '';
+        config-h-golden = pkgs.runCommand "config-h-golden" { } ''
+          set -euo pipefail
+          diff -u ${../config.h} ${generatedConfigH}
+          cp ${generatedConfigH} $out
+        '';
 
         # Build with XWayland support toggled on
         build-xwayland = pkgs.callPackage ./pkgs/dwl.nix {
@@ -427,6 +507,7 @@ _: {
         # Sanitized run smoke tests
         asan-ubsan-run = mkAsanUbsanRun { enableXWayland = false; };
         asan-ubsan-run-xwayland = mkAsanUbsanRun { enableXWayland = true; };
+        swallow-regression = mkSwallowRegression;
 
         # Strict warnings-as-errors builds
         warnings-strict = mkWarningsStrict { enableXWayland = false; };
