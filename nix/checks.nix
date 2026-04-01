@@ -34,15 +34,34 @@ _: {
 
       sanitizerLogPattern = "AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:|Shadow memory range interleaves";
 
+      footSwallowSpec = configLib.defaultSpec // {
+        terminal = {
+          argv = [ "footclient" ];
+          appId = "foot";
+        };
+        swallowTerminals = [
+          "foot"
+          "footclient"
+        ];
+        rules = [
+          { id = "mpv"; }
+        ];
+        scratchpads = [ ];
+        scratchRuleOrder = [ ];
+        scratchKeyOrder = [ ];
+      };
+
       mkSanitizedDwl =
         {
           enableXWayland ? false,
+          configSpec ? null,
         }:
         (pkgs.callPackage ./pkgs/dwl.nix {
           stdenv = pkgs.clangStdenv;
           inherit enableXWayland;
           inherit (pkgs) xorg;
           autostart = [ ];
+          inherit configSpec;
         }).overrideAttrs
           (prev: {
             makeFlags = (prev.makeFlags or [ ]) ++ [
@@ -57,12 +76,15 @@ _: {
         {
           name,
           enableXWayland ? false,
+          configSpec ? null,
           runtimeInputs ? [ ],
           startupScript,
           timeoutSeconds ? 8,
         }:
         let
-          sanPkg = mkSanitizedDwl { inherit enableXWayland; };
+          sanPkg = mkSanitizedDwl {
+            inherit enableXWayland configSpec;
+          };
         in
         pkgs.runCommand name
           {
@@ -407,6 +429,7 @@ _: {
 
       mkSwallowRegression = mkSanitizedRunCheck {
         name = "dwl-swallow-regression";
+        configSpec = footSwallowSpec;
         runtimeInputs = [
           pkgs.bash
           pkgs.foot
@@ -418,6 +441,25 @@ _: {
           sleep 1
           ${pkgs.foot}/bin/footclient -e ${pkgs.bash}/bin/bash -lc \
             'sleep 1; exec ${pkgs.mpv}/bin/mpv --no-config --ao=null --vo=gpu --gpu-context=wayland --frames=2 av://lavfi:testsrc2=size=128x128:rate=1' \
+            >/dev/null 2>&1 &
+          sleep 6
+        '';
+      };
+
+      mkSwallowParentExitRegression = mkSanitizedRunCheck {
+        name = "dwl-swallow-parent-exit-regression";
+        configSpec = footSwallowSpec;
+        runtimeInputs = [
+          pkgs.bash
+          pkgs.foot
+          pkgs.mpv
+        ];
+        timeoutSeconds = 12;
+        startupScript = ''
+          ${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &
+          sleep 1
+          ${pkgs.foot}/bin/footclient -e ${pkgs.bash}/bin/bash -lc \
+            '${pkgs.mpv}/bin/mpv --no-config --ao=null --vo=gpu --gpu-context=wayland --frames=120 av://lavfi:testsrc2=size=128x128:rate=60 >/dev/null 2>&1 & sleep 1; exit 0' \
             >/dev/null 2>&1 &
           sleep 6
         '';
@@ -508,6 +550,7 @@ _: {
         asan-ubsan-run = mkAsanUbsanRun { enableXWayland = false; };
         asan-ubsan-run-xwayland = mkAsanUbsanRun { enableXWayland = true; };
         swallow-regression = mkSwallowRegression;
+        swallow-parent-exit-regression = mkSwallowParentExitRegression;
 
         # Strict warnings-as-errors builds
         warnings-strict = mkWarningsStrict { enableXWayland = false; };

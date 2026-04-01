@@ -184,6 +184,9 @@ struct Client {
   char scratchkey;
   uint32_t resize; /* configure serial of a pending resize */
   pid_t pid;
+  int ismapped;
+  int in_client_list;
+  int in_fstack;
   Client *swallowing; /* client being hidden */
   Client *swallowedby;
 };
@@ -369,6 +372,9 @@ static void destroynotify(struct wl_listener *listener, void *data);
 static void destroypointerconstraint(struct wl_listener *listener, void *data);
 static void destroysessionlock(struct wl_listener *listener, void *data);
 static void destroykeyboardgroup(struct wl_listener *listener, void *data);
+static void focusstackinsert(struct wl_list *pos, Client *c);
+static void focusstackremove(Client *c);
+static void insertclient(struct wl_list *pos, Client *c);
 static Monitor *dirtomon(enum wlr_direction dir);
 static void drawbar(Monitor *m);
 static void drawbars(void);
@@ -410,8 +416,11 @@ static void outputmgrtest(struct wl_listener *listener, void *data);
 static pid_t parentpid(pid_t pid);
 static void pointerfocus(Client *c, struct wlr_surface *surface, double sx,
                          double sy, uint32_t time);
+static void refreshclient(Client *c);
+static void removeclient(Client *c);
 static int statusin(int fd, unsigned int mask, void *data);
 static void togglebar(const Arg *arg);
+static void unswallow(Client *c, int restore_hidden);
 static void updatebar(Monitor *m);
 static void powermgrsetmode(struct wl_listener *listener, void *data);
 static void quit(const Arg *arg);
@@ -449,6 +458,7 @@ static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
 static void unlocksession(struct wl_listener *listener, void *data);
 static void unmaplayersurfacenotify(struct wl_listener *listener, void *data);
+static void unmanage(Client *c);
 static void unmapnotify(struct wl_listener *listener, void *data);
 static void updatemons(struct wl_listener *listener, void *data);
 static void updatebar(Monitor *m);
@@ -1737,6 +1747,8 @@ void destroylocksurface(struct wl_listener *listener, void *data) {
 void destroynotify(struct wl_listener *listener, void *data) {
   /* Called when the xdg_toplevel is destroyed. */
   Client *c = wl_container_of(listener, c, destroy);
+
+  unmanage(c);
   wl_list_remove(&c->destroy.link);
   wl_list_remove(&c->set_title.link);
   wl_list_remove(&c->fullscreen.link);
@@ -1785,6 +1797,106 @@ void destroykeyboardgroup(struct wl_listener *listener, void *data) {
   wl_list_remove(&group->destroy.link);
   wlr_keyboard_group_destroy(group->wlr_group);
   free(group);
+}
+
+void focusstackinsert(struct wl_list *pos, Client *c) {
+  if (c->in_fstack)
+    wl_list_remove(&c->flink);
+  wl_list_insert(pos, &c->flink);
+  c->in_fstack = 1;
+}
+
+void focusstackremove(Client *c) {
+  if (!c->in_fstack)
+    return;
+  wl_list_remove(&c->flink);
+  c->in_fstack = 0;
+}
+
+void insertclient(struct wl_list *pos, Client *c) {
+  if (c->in_client_list)
+    wl_list_remove(&c->link);
+  wl_list_insert(pos, &c->link);
+  c->in_client_list = 1;
+}
+
+void refreshclient(Client *c) {
+  if (!c)
+    return;
+  c->bw = c->isfullscreen ? 0 : BORDERPX(c);
+  if (c->scene && c->ismapped && c->mon)
+    setfullscreen(c, c->isfullscreen);
+}
+
+void removeclient(Client *c) {
+  if (!c->in_client_list)
+    return;
+  wl_list_remove(&c->link);
+  c->in_client_list = 0;
+}
+
+void unswallow(Client *c, int restore_hidden) {
+  Client *hidden;
+
+  if (!c || !(hidden = c->swallowing))
+    return;
+
+  c->swallowing = NULL;
+  if (restore_hidden) {
+    if (hidden->swallowedby == c)
+      hidden->swallowedby = NULL;
+    hidden->tags = c->tags;
+    if (c->in_client_list && hidden->in_client_list)
+      insertclient(&c->link, hidden);
+    if (c->in_fstack && hidden->in_fstack)
+      focusstackinsert(&c->flink, hidden);
+  }
+
+  refreshclient(c);
+
+  if (!restore_hidden && hidden->swallowedby == c)
+    hidden->swallowedby = NULL;
+}
+
+void unmanage(Client *c) {
+  Client *swallower;
+
+  if (!c->ismapped && !c->scene && !c->swallowing && !c->swallowedby &&
+      !c->in_client_list && !c->in_fstack)
+    return;
+
+  c->ismapped = 0;
+  swallower = c->swallowedby;
+
+  if (c == grabc) {
+    cursor_mode = CurNormal;
+    grabc = NULL;
+  }
+
+  if (c->swallowing)
+    unswallow(c, 1);
+  if (swallower && swallower->swallowing == c)
+    unswallow(swallower, 0);
+
+  if (client_is_unmanaged(c)) {
+    if (c == exclusive_focus) {
+      exclusive_focus = NULL;
+      focusclient(focustop(selmon), 1);
+    }
+  } else {
+    removeclient(c);
+    setmon(c, NULL, 0);
+    focusstackremove(c);
+  }
+
+  if (c->scene) {
+    wlr_scene_node_destroy(&c->scene->node);
+    c->scene = NULL;
+    c->scene_surface = NULL;
+  }
+
+  drawbars();
+  motionnotify(0, NULL, 0, 0, 0, 0);
 }
 
 Monitor *dirtomon(enum wlr_direction dir) {
@@ -2001,8 +2113,7 @@ void focusclient(Client *c, int lift) {
 
   /* Put the new client atop the focus stack and select its monitor */
   if (c && !client_is_unmanaged(c)) {
-    wl_list_remove(&c->flink);
-    wl_list_insert(&fstack, &c->flink);
+    focusstackinsert(&fstack, c);
     selmon = c->mon;
     c->isurgent = 0;
 
@@ -2430,6 +2541,7 @@ void mapnotify(struct wl_listener *listener, void *data) {
 
   /* Create scene tree for this client and its border */
   c->scene = client_surface(c)->data = wlr_scene_tree_create(layers[LyrTile]);
+  c->ismapped = 1;
   /* Enabled later by a call to arrange() */
   wlr_scene_node_set_enabled(&c->scene->node, client_is_unmanaged(c));
   c->scene_surface =
@@ -2468,12 +2580,8 @@ void mapnotify(struct wl_listener *listener, void *data) {
   c->geom.height += 2 * c->bw;
 
   /* Insert this client into client lists. */
-  if (clients.prev)
-    // tile at the bottom
-    wl_list_insert(clients.prev, &c->link);
-  else
-    wl_list_insert(&clients, &c->link);
-  wl_list_insert(&fstack, &c->flink);
+  insertclient(clients.prev, c);
+  focusstackinsert(&fstack, c);
 
   /* Set initial monitor, tags, floating status, and focus:
    * we always consider floating, clients that have parent and thus
@@ -2573,8 +2681,7 @@ void movestack(const Arg *arg) {
     c = wl_container_of(c->link.prev, c, link);
   }
 
-  wl_list_remove(&sel->link);
-  wl_list_insert(&c->link, &sel->link);
+  insertclient(&c->link, sel);
   arrange(selmon);
 }
 
@@ -3475,23 +3582,21 @@ int statusin(int fd, unsigned int mask, void *data) {
 }
 
 void swallow(Client *c, Client *toswallow) {
-  Client *swallowed;
-
   if (!c || c == toswallow)
     return;
 
   if (toswallow) {
-    if (c->swallowing || c->swallowedby || toswallow->swallowing ||
-        toswallow->swallowedby)
+    if (!c->ismapped || !toswallow->ismapped || c->swallowing ||
+        c->swallowedby || toswallow->swallowing || toswallow->swallowedby)
       return;
 
     c->swallowing = toswallow;
     toswallow->swallowedby = c;
     toswallow->mon = c->mon;
-    wl_list_remove(&c->link);
-    wl_list_insert(&c->swallowing->link, &c->link);
-    wl_list_remove(&c->flink);
-    wl_list_insert(&c->swallowing->flink, &c->flink);
+    if (c->in_client_list && toswallow->in_client_list)
+      insertclient(&toswallow->link, c);
+    if (c->in_fstack && toswallow->in_fstack)
+      focusstackinsert(&toswallow->flink, c);
     c->bw = BORDERPX(c);
     c->tags = toswallow->tags;
     c->isfloating = toswallow->isfloating;
@@ -3500,19 +3605,7 @@ void swallow(Client *c, Client *toswallow) {
     return;
   }
 
-  swallowed = c->swallowing;
-  if (!swallowed)
-    return;
-
-  c->swallowing = NULL;
-  swallowed->swallowedby = NULL;
-  wl_list_remove(&swallowed->link);
-  wl_list_insert(&c->link, &swallowed->link);
-  wl_list_remove(&swallowed->flink);
-  wl_list_insert(&c->flink, &swallowed->flink);
-  swallowed->tags = c->tags;
-  c->bw = BORDERPX(c);
-  setfullscreen(c, 0);
+  unswallow(c, 1);
 }
 
 void tag(const Arg *arg) {
@@ -3561,24 +3654,29 @@ Client *termforwin(Client *c) {
     pids[pids_len++] = pid;
   }
 
-  /* foot --server windows share one client pid, so prefer the currently
-   * focused terminal when multiple isterm clients match the same parent pid. */
-  if (focused && focused->pid && focused->isterm && !focused->swallowedby &&
-      !focused->swallowing) {
-    for (i = 0; i < pids_len; i++) {
-      if (pids[i] == focused->pid)
-        return focused;
-    }
-  }
-
   /* Find closest parent */
   for (i = 0; i < pids_len; i++) {
+    Client *match = NULL;
+    int matches = 0;
+
     wl_list_for_each(p, &clients, link) {
-      if (!p->pid || !p->isterm || p->swallowedby || p->swallowing)
+      if (!p->pid || !p->isterm || !p->ismapped || p->swallowedby ||
+          p->swallowing || p->pid != pids[i])
         continue;
-      if (pids[i] == p->pid)
-        return p;
+
+      matches++;
+      if (p == focused)
+        return focused;
+      if (!match)
+        match = p;
     }
+
+    /* foot --server windows share one client pid; if multiple terminals match
+     * the same parent pid and none is focused, the association is ambiguous. */
+    if (matches == 1)
+      return match;
+    if (matches > 1)
+      return NULL;
   }
 
   return NULL;
@@ -3764,34 +3862,8 @@ void unmaplayersurfacenotify(struct wl_listener *listener, void *data) {
 void unmapnotify(struct wl_listener *listener, void *data) {
   /* Called when the surface is unmapped, and should no longer be shown. */
   Client *c = wl_container_of(listener, c, unmap);
-  Client *swallowed = c->swallowing;
-  Client *swallower = c->swallowedby;
-  if (c == grabc) {
-    cursor_mode = CurNormal;
-    grabc = NULL;
-  }
 
-  if (swallowed) {
-    swallow(c, NULL);
-  }
-  if (swallower && swallower->swallowing == c) {
-    swallow(swallower, NULL);
-  }
-
-  if (client_is_unmanaged(c)) {
-    if (c == exclusive_focus) {
-      exclusive_focus = NULL;
-      focusclient(focustop(selmon), 1);
-    }
-  } else {
-    wl_list_remove(&c->link);
-    setmon(c, NULL, 0);
-    wl_list_remove(&c->flink);
-  }
-
-  wlr_scene_node_destroy(&c->scene->node);
-  drawbars();
-  motionnotify(0, NULL, 0, 0, 0, 0);
+  unmanage(c);
 }
 
 void updatemons(struct wl_listener *listener, void *data) {
@@ -4119,8 +4191,7 @@ void zoom(const Arg *arg) {
    * front */
   if (!sel)
     sel = c;
-  wl_list_remove(&sel->link);
-  wl_list_insert(&clients, &sel->link);
+  insertclient(&clients, sel);
 
   focusclient(sel, 1);
   arrange(selmon);
