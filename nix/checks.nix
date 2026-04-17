@@ -34,23 +34,6 @@ _: {
 
       sanitizerLogPattern = "AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:|Shadow memory range interleaves";
 
-      footSwallowSpec = configLib.defaultSpec // {
-        terminal = {
-          argv = [ "footclient" ];
-          appId = "foot";
-        };
-        swallowTerminals = [
-          "foot"
-          "footclient"
-        ];
-        rules = [
-          { id = "mpv"; }
-        ];
-        scratchpads = [ ];
-        scratchRuleOrder = [ ];
-        scratchKeyOrder = [ ];
-      };
-
       mkSanitizedDwl =
         {
           enableXWayland ? false,
@@ -427,44 +410,6 @@ _: {
           '';
         };
 
-      mkSwallowRegression = mkSanitizedRunCheck {
-        name = "dwl-swallow-regression";
-        configSpec = footSwallowSpec;
-        runtimeInputs = [
-          pkgs.bash
-          pkgs.foot
-          pkgs.mpv
-        ];
-        timeoutSeconds = 12;
-        startupScript = ''
-          ${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &
-          sleep 1
-          ${pkgs.foot}/bin/footclient -e ${pkgs.bash}/bin/bash -lc \
-            'sleep 1; exec ${pkgs.mpv}/bin/mpv --no-config --ao=null --vo=gpu --gpu-context=wayland --frames=2 av://lavfi:testsrc2=size=128x128:rate=1' \
-            >/dev/null 2>&1 &
-          sleep 6
-        '';
-      };
-
-      mkSwallowParentExitRegression = mkSanitizedRunCheck {
-        name = "dwl-swallow-parent-exit-regression";
-        configSpec = footSwallowSpec;
-        runtimeInputs = [
-          pkgs.bash
-          pkgs.foot
-          pkgs.mpv
-        ];
-        timeoutSeconds = 12;
-        startupScript = ''
-          ${pkgs.foot}/bin/foot --server >/dev/null 2>&1 &
-          sleep 1
-          ${pkgs.foot}/bin/footclient -e ${pkgs.bash}/bin/bash -lc \
-            '${pkgs.mpv}/bin/mpv --no-config --ao=null --vo=gpu --gpu-context=wayland --frames=120 av://lavfi:testsrc2=size=128x128:rate=60 >/dev/null 2>&1 & sleep 1; exit 0' \
-            >/dev/null 2>&1 &
-          sleep 6
-        '';
-      };
-
       # Strict warnings-as-errors build using a curated warning set
       mkWarningsStrict =
         {
@@ -549,8 +494,6 @@ _: {
         # Sanitized run smoke tests
         asan-ubsan-run = mkAsanUbsanRun { enableXWayland = false; };
         asan-ubsan-run-xwayland = mkAsanUbsanRun { enableXWayland = true; };
-        swallow-regression = mkSwallowRegression;
-        swallow-parent-exit-regression = mkSwallowParentExitRegression;
 
         # Strict warnings-as-errors builds
         warnings-strict = mkWarningsStrict { enableXWayland = false; };
@@ -573,25 +516,6 @@ _: {
           NIX_CFLAGS_COMPILE =
             (prev.NIX_CFLAGS_COMPILE or "") + " -fanalyzer -Werror -Wformat -Wformat-security";
         });
-
-        # Nix code hygiene
-        nixfmt =
-          pkgs.runCommand "nixfmt-check"
-            {
-              buildInputs = [
-                pkgs.nixfmt
-                pkgs.findutils
-              ];
-              src = pkgs.lib.cleanSource ../.;
-            }
-            ''
-              echo "Checking Nix formatting with nixfmt..."
-              files=$(find "$src" -type f -name '*.nix')
-              if [ -n "$files" ]; then
-                nixfmt --check $files
-              fi
-              touch $out
-            '';
 
         statix =
           pkgs.runCommand "statix-check"

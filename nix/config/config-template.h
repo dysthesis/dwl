@@ -55,8 +55,7 @@ static const char *const autostart[] = {
     "wbg", "/path/to/your/image", NULL, NULL /* terminate */
 };
 
-/* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at
- * least one example) */
+/* Keep at least one rule declared, even if you do not use rules. */
 
 #define RULE(...) {.monitor = -1, __VA_ARGS__}
 #define SCRATCH(...) RULE(.isfloating = 1, .w = 0.75, .h = 0.75, __VA_ARGS__)
@@ -77,20 +76,17 @@ static const Layout layouts[] = {
  * WARNING: negative values other than (-1, -1) cause problems with Xwayland
  * clients https://gitlab.freedesktop.org/xorg/xserver/-/issues/899
  */
-/* NOTE: ALWAYS add a fallback rule, even if you are completely sure it won't be
- * used */
+/* Keep a fallback monitor rule; dwl requires at least one monitor rule. */
 static const MonitorRule monrules[] = {
     /* name   scale  rotate/reflect                x    y */
     /* example of a HiDPI laptop monitor:
     { "eDP-1",    2, WL_OUTPUT_TRANSFORM_NORMAL,   -1,  -1 },
     */
-    /* defaults */
     {NULL, 1, WL_OUTPUT_TRANSFORM_NORMAL, -1, -1},
 };
 
 static const TagRule tagrules[] = {
     /* tag     mfact      nmaster   layout */
-    /* defaults */
     {0, 0.55f, 1, &layouts[0]}};
 
 /* keyboard */
@@ -186,7 +182,7 @@ const char *raisebright[] = {"brightnessctl", "set", "5%+", NULL};
 const char *lowerbright[] = {"brightnessctl", "set", "5%-", NULL};
 
 static const Key keys[] = {
-    /* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
+    /* Note that Shift changes certain key codes: 2 -> at, etc. */
     /* modifier                  key                 function        argument */
     {MODKEY, XKB_KEY_r, spawn, {.v = menucmd}},
     {MODKEY, XKB_KEY_Return, spawn, {.v = termcmd}},
@@ -197,8 +193,8 @@ static const Key keys[] = {
 @@SCRATCH_KEYS@@
     {MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
     {MODKEY, XKB_KEY_k, focusstack, {.i = -1}},
-    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_J, movestack, {.i = +1}},
-    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_K, movestack, {.i = -1}},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_j, movestack, {.i = +1}},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_k, movestack, {.i = -1}},
     // {MODKEY, XKB_KEY_i, incnmaster, {.i = +1}},
     // {MODKEY, XKB_KEY_d, incnmaster, {.i = -1}},
     {MODKEY, XKB_KEY_h, setmfact, {.f = -0.05f}},
@@ -213,7 +209,7 @@ static const Key keys[] = {
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_space, togglefloating, {0}},
     {MODKEY, XKB_KEY_e, togglefullscreen, {0}},
     {MODKEY, XKB_KEY_a, toggleswallow, {0}},
-    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_A, toggleautoswallow, {0}},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_a, toggleautoswallow, {0}},
     {MODKEY, XKB_KEY_0, view, {.ui = ~0}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag, {.ui = ~0}},
     {MODKEY, XKB_KEY_comma, focusmon, {.i = WLR_DIRECTION_LEFT}},
@@ -235,7 +231,7 @@ static const Key keys[] = {
     TAGKEYS(XKB_KEY_7, XKB_KEY_ampersand, 6),
     TAGKEYS(XKB_KEY_8, XKB_KEY_asterisk, 7),
     TAGKEYS(XKB_KEY_9, XKB_KEY_parenleft, 8),
-    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_Q, quit, {0}},
+    {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_q, quit, {0}},
 
     /* Ctrl-Alt-Backspace and Ctrl-Alt-Fx used to be handled by X server */
     {WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT, XKB_KEY_Terminate_Server, quit, {0}},

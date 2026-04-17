@@ -21,6 +21,7 @@ _: {
           deadnix
           clang-analyzer
           clang-tools
+					mergiraf
         ];
       };
     };
