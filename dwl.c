@@ -649,7 +649,7 @@ void applyrules(Client *c) {
         if (r->monitor == i++)
           mon = m;
       }
-      if (c->isfloating || !mon->lt[mon->sellt]->arrange) {
+      if (mon && (c->isfloating || !mon->lt[mon->sellt]->arrange)) {
         /* client is floating or in floating layout */
         struct wlr_box b = respect_monitor_reserved_area ? mon->w : mon->m;
         /* compute target size first */
@@ -1901,6 +1901,8 @@ void unmanage(Client *c) {
 
 Monitor *dirtomon(enum wlr_direction dir) {
   struct wlr_output *next;
+  if (!selmon)
+    return NULL;
   if (!wlr_output_layout_get(output_layout, selmon->wlr_output))
     return selmon;
   if ((next = wlr_output_layout_adjacent_output(
@@ -2164,10 +2166,12 @@ void focusclient(Client *c, int lift) {
 
 void focusmon(const Arg *arg) {
   int i = 0, nmons = wl_list_length(&mons);
+  if (!selmon)
+    return;
   if (nmons) {
     do /* don't switch to disabled mons */
       selmon = dirtomon(arg->i);
-    while (!selmon->wlr_output->enabled && i++ < nmons);
+    while (selmon && !selmon->wlr_output->enabled && i++ < nmons);
   }
   focusclient(focustop(selmon), 1);
 }
