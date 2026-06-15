@@ -390,7 +390,8 @@ static void fullscreennotify(struct wl_listener *listener, void *data);
 static void gpureset(struct wl_listener *listener, void *data);
 static unsigned int getpertagtag(unsigned int curtagset);
 static size_t getunusedtag(void);
-static void handlesig(int signo);
+static int handlesig(int signo, void *data);
+static void unblocksignals(void);
 static void incnmaster(const Arg *arg);
 static void inputdevice(struct wl_listener *listener, void *data);
 static int keybinding(uint32_t mods, xkb_keysym_t sym);
@@ -857,6 +858,12 @@ void attachclients(Monitor *m) {
   }
 }
 
+void unblocksignals(void) {
+  sigset_t set;
+  sigemptyset(&set);
+  sigprocmask(SIG_SETMASK, &set, NULL);
+}
+
 void autostartexec(void) {
   const char *const *p;
   size_t i = 0;
@@ -869,6 +876,7 @@ void autostartexec(void) {
   autostart_pids = ecalloc(autostart_len, sizeof(pid_t));
   for (p = autostart; *p; i++, p++) {
     if ((autostart_pids[i] = fork()) == 0) {
+      unblocksignals();
       setsid();
       /* flawfinder: ignore */
       execvp(*p, (char *const *)p);
@@ -2372,7 +2380,8 @@ void gpureset(struct wl_listener *listener, void *data) {
   wlr_renderer_destroy(old_drw);
 }
 
-void handlesig(int signo) {
+int handlesig(int signo, void *data) {
+  (void)data;
   if (signo == SIGCHLD) {
     pid_t pid, *p, *lim;
     while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
@@ -2392,6 +2401,7 @@ void handlesig(int signo) {
   } else if (signo == SIGINT || signo == SIGTERM) {
     quit(NULL);
   }
+  return 0;
 }
 
 void __attribute__((unused)) incnmaster(const Arg *arg) {
@@ -3102,6 +3112,7 @@ void run(char *startup_cmd) {
     if ((child_pid = fork()) < 0)
       die("startup: fork:");
     if (child_pid == 0) {
+      unblocksignals();
       close(STDIN_FILENO);
       setsid();
       close(piperw[0]);
@@ -3308,12 +3319,8 @@ void setsel(struct wl_listener *listener, void *data) {
 
 void setup(void) {
   const TagRule *r;
-  int drm_fd, i, sig[] = {SIGCHLD, SIGINT, SIGTERM, SIGPIPE};
-  struct sigaction sa = {.sa_flags = SA_RESTART, .sa_handler = handlesig};
-  sigemptyset(&sa.sa_mask);
-
-  for (i = 0; i < (int)LENGTH(sig); i++)
-    sigaction(sig[i], &sa, NULL);
+  int drm_fd, i;
+  signal(SIGPIPE, SIG_IGN);
 
   wlr_log_init(log_level, NULL);
 
@@ -3321,6 +3328,12 @@ void setup(void) {
    * clients from the Unix socket, manging Wayland globals, and so on. */
   dpy = wl_display_create();
   event_loop = wl_display_get_event_loop(dpy);
+
+  /* Deliver these via the event loop (signalfd) so they run in normal context,
+   * where wl_display_terminate and waitpid are safe. */
+  wl_event_loop_add_signal(event_loop, SIGCHLD, handlesig, NULL);
+  wl_event_loop_add_signal(event_loop, SIGINT, handlesig, NULL);
+  wl_event_loop_add_signal(event_loop, SIGTERM, handlesig, NULL);
 
   /* The backend is a wlroots feature which abstracts the underlying input and
    * output hardware. The autocreate option will choose the most suitable
@@ -3558,6 +3571,7 @@ void setup(void) {
 
 void spawn(const Arg *arg) {
   if (fork() == 0) {
+    unblocksignals();
     close(STDIN_FILENO);
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
@@ -3569,6 +3583,7 @@ void spawn(const Arg *arg) {
 
 void spawnscratch(const Arg *arg) {
   if (fork() == 0) {
+    unblocksignals();
     dup2(STDERR_FILENO, STDOUT_FILENO);
     setsid();
     /* flawfinder: ignore */
