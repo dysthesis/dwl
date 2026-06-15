@@ -866,7 +866,7 @@ void autostartexec(void) {
     while (*++p)
       ;
 
-  autostart_pids = calloc(autostart_len, sizeof(pid_t));
+  autostart_pids = ecalloc(autostart_len, sizeof(pid_t));
   for (p = autostart; *p; i++, p++) {
     if ((autostart_pids[i] = fork()) == 0) {
       setsid();
