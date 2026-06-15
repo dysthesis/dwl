@@ -2915,16 +2915,26 @@ void outputmgrtest(struct wl_listener *listener, void *data) {
 }
 
 pid_t parentpid(pid_t pid) {
-  unsigned int v = 0;
+  unsigned int ppid = 0;
   FILE *f;
-  char buf[256];
-  snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)pid);
+  char buf[256], *p;
+  size_t n;
+
+  snprintf(buf, sizeof buf, "/proc/%u/stat", (unsigned)pid);
   if (!(f = fopen(buf, "r")))
     return 0;
-  if (fscanf(f, "%*u %*s %*c %u", &v) != 1)
-    v = 0;
+  /* The comm (2nd) field is attacker-controlled (PR_SET_NAME/argv[0]) and the
+   * kernel prints it verbatim in parentheses, including spaces and ')'. A
+   * whitespace-tokenised scanf desyncs the layout, so read the whole record and
+   * parse the fixed fields AFTER the final ')'. */
+  n = fread(buf, 1, sizeof buf - 1, f);
   fclose(f);
-  return (pid_t)v;
+  buf[n] = '\0';
+  if (!(p = strrchr(buf, ')')))
+    return 0;
+  if (sscanf(p + 1, " %*c %u", &ppid) != 1)
+    return 0;
+  return (pid_t)ppid;
 }
 
 void pointerfocus(Client *c, struct wlr_surface *surface, double sx, double sy,
