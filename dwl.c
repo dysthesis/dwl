@@ -1404,6 +1404,10 @@ void createlayersurface(struct wl_listener *listener, void *data) {
     wlr_layer_surface_v1_destroy(layer_surface);
     return;
   }
+  if (!layer_surface->output->data) {
+    wlr_layer_surface_v1_destroy(layer_surface);
+    return;
+  }
 
   l = layer_surface->data = ecalloc(1, sizeof(*l));
   l->type = LayerShell;
@@ -1431,7 +1435,13 @@ void createlocksurface(struct wl_listener *listener, void *data) {
   SessionLock *lock = wl_container_of(listener, lock, new_surface);
   struct wlr_session_lock_surface_v1 *lock_surface = data;
   Monitor *m = lock_surface->output->data;
-  struct wlr_scene_tree *scene_tree = lock_surface->surface->data =
+  struct wlr_scene_tree *scene_tree;
+
+  if (!m) {
+    wl_resource_destroy(lock_surface->resource);
+    return;
+  }
+  scene_tree = lock_surface->surface->data =
       wlr_scene_subsurface_tree_create(lock->scene, lock_surface->surface);
   m->lock_surface = lock_surface;
 
@@ -2866,6 +2876,8 @@ void outputmgrapplyortest(struct wlr_output_configuration_v1 *config,
     Monitor *m = wlr_output->data;
     struct wlr_output_state state;
 
+    if (!m)
+      continue;
     /* Ensure displays previously disabled by wlr-output-power-management-v1
      * are properly handled*/
     m->asleep = 0;
