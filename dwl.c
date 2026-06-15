@@ -1301,14 +1301,14 @@ void commitpopup(struct wl_listener *listener, void *data) {
 
   type = toplevel_from_wlr_surface(popup->base->surface, &c, &l);
   if (!popup->parent || type < 0)
-    return;
+    goto unregister;
   popup->base->surface->data =
       wlr_scene_xdg_surface_create(popup->parent->data, popup->base);
 
   if (type == LayerShell) {
     if (!l || !l->mon) {
       wlr_xdg_popup_destroy(popup);
-      return;
+      goto unregister;
     }
     box = l->mon->m;
     box.x -= l->scene->node.x;
@@ -1316,13 +1316,14 @@ void commitpopup(struct wl_listener *listener, void *data) {
   } else {
     if (!c || !c->mon) {
       wlr_xdg_popup_destroy(popup);
-      return;
+      goto unregister;
     }
     box = c->mon->w;
     box.x -= c->geom.x;
     box.y -= c->geom.y;
   }
   wlr_xdg_popup_unconstrain_from_box(popup, &box);
+unregister:
   wl_list_remove(&listener->link);
   free(listener);
 }
