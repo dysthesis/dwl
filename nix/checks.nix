@@ -51,7 +51,7 @@ _: {
               "CFLAGS+=-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-pie"
               "LDFLAGS+=-fsanitize=address,undefined -no-pie"
             ];
-            hardeningDisable = (prev.hardeningDisable or [ ]) ++ [ "pie" ];
+            hardeningDisable = (prev.hardeningDisable or [ ]) ++ [ "pic" ];
             __structuredAttrs = true;
           });
 
