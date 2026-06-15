@@ -3570,9 +3570,11 @@ int statusin(int fd, unsigned int mask, void *data) {
     wl_event_source_remove(status_event_source);
 
   n = read(fd, status, sizeof(status) - 1);
-  if (n < 0 && errno != EWOULDBLOCK)
-    die("read:");
-
+  if (n < 0) {
+    if (errno != EWOULDBLOCK)
+      die("read:");
+    return 0;
+  }
   status[n] = '\0';
   status[strcspn(status, "\n")] = '\0';
 
