@@ -59,7 +59,7 @@ static const char *const autostart[] = {
 
 #define RULE(...) {.monitor = -1, __VA_ARGS__}
 #define SCRATCH(...) RULE(.isfloating = 1, .w = 0.75, .h = 0.75, __VA_ARGS__)
-static const Rule rules[] = {@ @RULES @ @};
+static const Rule rules[] = {@@RULES@@};
 
 /* layout(s) */
 static const Layout layouts[] = {
@@ -165,10 +165,10 @@ static const enum libinput_config_tap_button_map button_map =
   }
 
 /* commands */
-@ @TERMCMD @ @ @ @MENUCMD @ @
+@@TERMCMD@@ @@MENUCMD@@
 
     /* named scratchpads - First arg only serves to match against key in rules*/
-    @ @SCRATCH_CMDS @ @
+    @@SCRATCH_CMDS@@
 
     const char *raisevol[] = {
         "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
@@ -187,7 +187,7 @@ static const Key keys[] = {
     {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
     {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
     {0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = lowerbright}},
-    @ @SCRATCH_KEYS @ @{MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
+    @@SCRATCH_KEYS@@{MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
     {MODKEY, XKB_KEY_k, focusstack, {.i = -1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_j, movestack, {.i = +1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_k, movestack, {.i = -1}},
