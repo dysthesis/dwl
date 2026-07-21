@@ -17,7 +17,7 @@ static const int topbar = 0;        /* 0 means bottom bar */
 static const int centeredtitle = 1; /* 1 means centered title */
 static const int vertpad = 0;       /* vertical padding of bar */
 static const int sidepad = 0;       /* horizontal padding of bar */
-static const char *fonts[] = {"JBMono Nerd Font:size=9"};
+static const char *fonts[] = {"IosevkaCadmus Nerd Font:size=9.5"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
 static const float focuscolor[] = COLOR(0xffffffff);
@@ -59,9 +59,7 @@ static const char *const autostart[] = {
 
 #define RULE(...) {.monitor = -1, __VA_ARGS__}
 #define SCRATCH(...) RULE(.isfloating = 1, .w = 0.75, .h = 0.75, __VA_ARGS__)
-static const Rule rules[] = {
-@@RULES@@
-};
+static const Rule rules[] = {@ @RULES @ @};
 
 /* layout(s) */
 static const Layout layouts[] = {
@@ -167,14 +165,13 @@ static const enum libinput_config_tap_button_map button_map =
   }
 
 /* commands */
-@@TERMCMD@@
-@@MENUCMD@@
+@ @TERMCMD @ @ @ @MENUCMD @ @
 
-/* named scratchpads - First arg only serves to match against key in rules*/
-@@SCRATCH_CMDS@@
+    /* named scratchpads - First arg only serves to match against key in rules*/
+    @ @SCRATCH_CMDS @ @
 
-const char *raisevol[] = {
-    "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
+    const char *raisevol[] = {
+        "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
 };
 const char *lowervol[] = {"wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-",
                           NULL};
@@ -190,8 +187,7 @@ static const Key keys[] = {
     {0, XKB_KEY_XF86AudioLowerVolume, spawn, {.v = lowervol}},
     {0, XKB_KEY_XF86MonBrightnessUp, spawn, {.v = raisebright}},
     {0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = lowerbright}},
-@@SCRATCH_KEYS@@
-    {MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
+    @ @SCRATCH_KEYS @ @{MODKEY, XKB_KEY_j, focusstack, {.i = +1}},
     {MODKEY, XKB_KEY_k, focusstack, {.i = -1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_j, movestack, {.i = +1}},
     {MODKEY | WLR_MODIFIER_SHIFT, XKB_KEY_k, movestack, {.i = -1}},

@@ -17,7 +17,7 @@ static const int topbar = 0;        /* 0 means bottom bar */
 static const int centeredtitle = 1; /* 1 means centered title */
 static const int vertpad = 0;       /* vertical padding of bar */
 static const int sidepad = 0;       /* horizontal padding of bar */
-static const char *fonts[] = {"JBMono Nerd Font:size=9"};
+static const char *fonts[] = {"IosevkaCadmus Nerd Font:size=9.5"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
 static const float focuscolor[] = COLOR(0xffffffff);
@@ -184,27 +184,52 @@ static const char *termcmd[] = {"ghostty", NULL};
 static const char *menucmd[] = {"bemenu-run", NULL};
 
 /* named scratchpads - First arg only serves to match against key in rules*/
-static const char *termscratch[] = {
-    "t", "ghostty", "--class=ghostty.term", "--title=Terminal", NULL};
+static const char *termscratch[] = {"t", "ghostty", "--class=ghostty.term",
+                                    "--title=Terminal", NULL};
 
 static const char *btopscratch[] = {
     "b", "ghostty", "--class=ghostty.btop", "--title=Btop", "-e", "btop", NULL};
 
-static const char *musicscratch[] = {
-    "m", "ghostty", "--class=ghostty.music", "--title=Music", "-e", "spotify_player", NULL};
+static const char *musicscratch[] = {"m",
+                                     "ghostty",
+                                     "--class=ghostty.music",
+                                     "--title=Music",
+                                     "-e",
+                                     "spotify_player",
+                                     NULL};
 
-static const char *notescratch[] = {
-    "n", "ghostty", "--class=ghostty.note", "--title=Notes", "-e", "tmux", "new-session", "-As", "Notes", "-c", "/home/demiurge/Documents/Notes/Contents", "direnv", "exec", ".", "nvim", NULL};
+static const char *notescratch[] = {"n",
+                                    "ghostty",
+                                    "--class=ghostty.note",
+                                    "--title=Notes",
+                                    "-e",
+                                    "tmux",
+                                    "new-session",
+                                    "-As",
+                                    "Notes",
+                                    "-c",
+                                    "/home/demiurge/Documents/Notes/Contents",
+                                    "direnv",
+                                    "exec",
+                                    ".",
+                                    "nvim",
+                                    NULL};
 
 static const char *ircscratch[] = {
-    "i", "ghostty", "--class=ghostty.irc", "--title=IRC", "-e", "tmux", "new-session", "-As", "IRC", "irssi", NULL};
+    "i",           "ghostty", "--class=ghostty.irc",
+    "--title=IRC", "-e",      "tmux",
+    "new-session", "-As",     "IRC",
+    "irssi",       NULL};
 
-static const char *taskscratch[] = {
-    "d", "ghostty", "--class=ghostty.task", "--title=Task", "-e", "taskwarrior-tui", NULL};
+static const char *taskscratch[] = {"d",
+                                    "ghostty",
+                                    "--class=ghostty.task",
+                                    "--title=Task",
+                                    "-e",
+                                    "taskwarrior-tui",
+                                    NULL};
 
-static const char *signalscratch[] = {
-    "s", "signal-desktop", NULL};
-
+static const char *signalscratch[] = {"s", "signal-desktop", NULL};
 
 const char *raisevol[] = {
     "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%+", NULL,
