@@ -17,7 +17,7 @@ static const int topbar = 0;        /* 0 means bottom bar */
 static const int centeredtitle = 1; /* 1 means centered title */
 static const int vertpad = 0;       /* vertical padding of bar */
 static const int sidepad = 0;       /* horizontal padding of bar */
-static const char *fonts[] = {"IosevkaCadmus Nerd Font:size=8.5"};
+static const char *fonts[] = {"IosevkaCadmus Nerd Font:size=7.5"};
 static const float rootcolor[] = COLOR(0x000000ff);
 static const float bordercolor[] = COLOR(0x040404ff);
 static const float focuscolor[] = COLOR(0xffffffff);
